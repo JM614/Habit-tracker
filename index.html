@@ -15,6 +15,7 @@
   --accent: #2f9e44;
   --accent-soft: #d3f2dd;
   --danger: #e03131;
+  --sleep-mid: #e8a83c;
   --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
   --radius: 14px;
 }
@@ -29,6 +30,7 @@
   --accent: #51cf66;
   --accent-soft: #1e3a26;
   --danger: #ff6b6b;
+  --sleep-mid: #f2b93d;
   --shadow: 0 1px 3px rgba(0,0,0,0.4);
 }
 
@@ -97,6 +99,132 @@ h1 {
 .stat-label {
   font-size: 0.78rem;
   color: var(--text-dim);
+}
+
+.sleep-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  margin-bottom: 24px;
+}
+
+.sleep-top {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.sleep-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 20px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  flex-shrink: 0;
+}
+
+.sleep-status-emoji {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.sleep-status-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.sleep-status-label.good { color: var(--accent); }
+.sleep-status-label.mid { color: var(--sleep-mid); }
+.sleep-status-label.bad { color: var(--danger); }
+.sleep-status-label.none { color: var(--text-dim); }
+
+.sleep-gauge-wrap {
+  position: relative;
+  width: 160px;
+  height: 90px;
+  flex-shrink: 0;
+}
+
+.sleep-gauge {
+  display: block;
+}
+
+.gauge-track {
+  fill: none;
+  stroke: var(--heat-empty);
+  stroke-width: 12;
+  stroke-linecap: round;
+}
+
+.gauge-fill {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 12;
+  stroke-linecap: round;
+  stroke-dasharray: 50 100;
+  transition: stroke-dasharray 0.15s;
+}
+
+.sleep-gauge-value {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.6rem;
+  color: var(--text);
+}
+
+.sleep-gauge-max {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.sleep-controls {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sleep-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sleep-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.sleep-controls input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.sleep-controls input[type="number"] {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.95rem;
+  max-width: 140px;
+}
+
+.sleep-controls input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .add-form {
@@ -245,8 +373,17 @@ h1 {
   cursor: pointer;
 }
 
-.heat-cell.on {
+.heat-cell.on,
+.heat-cell.sleep-good {
   background: var(--accent);
+}
+
+.heat-cell.sleep-mid {
+  background: var(--sleep-mid);
+}
+
+.heat-cell.sleep-bad {
+  background: var(--danger);
 }
 
 .heat-cell.today {
@@ -282,6 +419,35 @@ h1 {
         <span class="stat-value" id="statBestStreak">0</span>
         <span class="stat-label">Mejor racha</span>
       </div>
+    </section>
+
+    <section class="sleep-card" id="sleepCard">
+      <div class="sleep-top">
+        <div class="sleep-gauge-wrap">
+          <svg class="sleep-gauge" viewBox="0 0 160 90">
+            <path class="gauge-track" d="M 15 80 A 65 65 0 0 1 145 80" pathLength="100"></path>
+            <path class="gauge-fill" id="gaugeFill" d="M 15 80 A 65 65 0 0 1 145 80" pathLength="100"></path>
+          </svg>
+          <div class="sleep-gauge-value">
+            <span id="sleepQualityValue">5</span><span class="sleep-gauge-max">/10</span>
+          </div>
+        </div>
+        <div class="sleep-controls">
+          <div class="sleep-field">
+            <label class="sleep-label" for="sleepQualityInput">🌙 Calidad del sueño</label>
+            <input type="range" id="sleepQualityInput" min="1" max="10" step="1" value="5">
+          </div>
+          <div class="sleep-field">
+            <label class="sleep-label" for="sleepHoursInput">Horas dormidas</label>
+            <input type="number" id="sleepHoursInput" min="0" max="24" step="0.5" placeholder="ej. 7.5">
+          </div>
+        </div>
+        <div class="sleep-status" id="sleepStatus">
+          <span class="sleep-status-emoji" id="sleepStatusEmoji">😐</span>
+          <span class="sleep-status-label" id="sleepStatusLabel">Regular</span>
+        </div>
+      </div>
+      <div class="heatmap" id="sleepHeatmap"></div>
     </section>
 
     <form id="addForm" class="add-form">
@@ -320,13 +486,31 @@ const addForm = document.getElementById("addForm");
 const habitInput = document.getElementById("habitInput");
 const template = document.getElementById("habitTemplate");
 const themeToggle = document.getElementById("themeToggle");
+const sleepQualityInput = document.getElementById("sleepQualityInput");
+const sleepHoursInput = document.getElementById("sleepHoursInput");
+const sleepQualityValue = document.getElementById("sleepQualityValue");
+const gaugeFill = document.getElementById("gaugeFill");
+const sleepStatusEmoji = document.getElementById("sleepStatusEmoji");
+const sleepStatusLabel = document.getElementById("sleepStatusLabel");
+const sleepHeatmap = document.getElementById("sleepHeatmap");
+
+const SLEEP_CATEGORY_INFO = {
+  good: { emoji: "😊", label: "Bien" },
+  mid: { emoji: "😐", label: "Regular" },
+  bad: { emoji: "😞", label: "Mal" },
+  none: { emoji: "🌙", label: "Sin datos" },
+};
 
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (!parsed.sleep) parsed.sleep = {};
+      return parsed;
+    }
   } catch (e) {}
-  return { habits: [] };
+  return { habits: [], sleep: {} };
 }
 
 function saveState() {
@@ -508,6 +692,83 @@ function render() {
   renderStats();
 }
 
+function getTodaySleep() {
+  return state.sleep[todayKey()] || {};
+}
+
+function setSleepQuality(value) {
+  const key = todayKey();
+  if (!state.sleep[key]) state.sleep[key] = {};
+  state.sleep[key].quality = value;
+  saveState();
+  renderSleep();
+}
+
+function setSleepHours(value) {
+  const key = todayKey();
+  if (!state.sleep[key]) state.sleep[key] = {};
+  state.sleep[key].hours = value;
+  saveState();
+  renderSleep();
+}
+
+function computeSleepScore(entry) {
+  if (!entry || entry.quality == null) return null;
+  if (entry.hours == null) return entry.quality;
+  const deviation = entry.hours < 7 ? 7 - entry.hours : entry.hours > 9 ? entry.hours - 9 : 0;
+  const hoursScore = Math.max(0, 10 - deviation * 2);
+  return (entry.quality + hoursScore) / 2;
+}
+
+function sleepCategory(score) {
+  if (score == null) return "none";
+  if (score >= 7) return "good";
+  if (score >= 4) return "mid";
+  return "bad";
+}
+
+function renderSleep() {
+  const today = getTodaySleep();
+  const quality = today.quality != null ? today.quality : 5;
+  sleepQualityValue.textContent = String(quality);
+  sleepQualityInput.value = String(quality);
+  gaugeFill.style.strokeDasharray = `${quality * 10} 100`;
+  sleepHoursInput.value = today.hours != null ? today.hours : "";
+
+  const category = sleepCategory(computeSleepScore(today));
+  const info = SLEEP_CATEGORY_INFO[category];
+  sleepStatusEmoji.textContent = info.emoji;
+  sleepStatusLabel.textContent = info.label;
+  sleepStatusLabel.className = `sleep-status-label ${category}`;
+
+  renderSleepHeatmap();
+}
+
+function renderSleepHeatmap() {
+  sleepHeatmap.innerHTML = "";
+  const days = buildHeatmapDays();
+  const today = todayKey();
+  for (const d of days) {
+    const key = dateKey(d);
+    const entry = state.sleep[key];
+    const category = sleepCategory(computeSleepScore(entry));
+    const info = SLEEP_CATEGORY_INFO[category];
+    const cell = document.createElement("div");
+    cell.className = "heat-cell" + (category !== "none" ? ` sleep-${category}` : "") + (key === today ? " today" : "");
+    cell.title = `${key}: ${info.emoji} ${info.label}`;
+    sleepHeatmap.appendChild(cell);
+  }
+}
+
+sleepQualityInput.addEventListener("input", (e) => {
+  setSleepQuality(Number(e.target.value));
+});
+
+sleepHoursInput.addEventListener("change", (e) => {
+  const value = e.target.value === "" ? null : Number(e.target.value);
+  setSleepHours(value);
+});
+
 function renderStats() {
   const total = state.habits.length;
   const doneToday = state.habits.filter((h) => h.dates[todayKey()]).length;
@@ -550,6 +811,7 @@ themeToggle.addEventListener("click", () => {
 })();
 
 render();
+renderSleep();
 </script>
 </body>
 </html>
