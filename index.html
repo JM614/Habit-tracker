@@ -19,6 +19,7 @@
   --warn: #f76707;
   --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
   --radius: 14px;
+  --cell: 11px;
 }
 
 [data-theme="dark"] {
@@ -293,7 +294,7 @@ h1 {
   accent-color: var(--accent);
 }
 
-.recovery-slider.unset {
+input[type="range"].unset {
   accent-color: var(--text-dim);
   opacity: 0.55;
 }
@@ -434,6 +435,10 @@ h1 {
   align-items: flex-end;
   margin-bottom: 8px;
 }
+
+/* Los campos de la serie se encogen con el ancho: si no, en 375 px la ✕ se
+   sale y la página entera gana scroll horizontal. */
+.set-row .field { min-width: 0; }
 
 .set-index {
   font-size: 0.8rem;
@@ -867,25 +872,70 @@ td.delta-better { color: var(--accent); }
   gap: 10px;
 }
 
-.drag-handle {
-  cursor: grab;
-  color: var(--text-dim);
-  font-size: 1rem;
-  padding: 4px;
+.habit-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
   flex-shrink: 0;
-  touch-action: none;
 }
 
-.drag-handle:active {
-  cursor: grabbing;
+/* Reordenar con dos botones: en pantalla táctil es mucho más confiable. */
+.move-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 10px 5px;
 }
 
-.habit-card.dragging {
-  opacity: 0.5;
+.move-btn:hover:not(:disabled) { color: var(--accent); }
+
+.move-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
 }
 
-.habit-card.drag-over {
-  border-color: var(--accent);
+.habit-name[contenteditable="true"] {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.habit-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  font-size: 0.85rem;
+}
+
+.habit-confirm-text {
+  flex: 1;
+  min-width: 120px;
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.btn-danger {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--danger);
+  color: white;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.habit-confirm .btn-ghost {
+  padding: 8px 12px;
+  font-size: 0.82rem;
 }
 
 .check-btn {
@@ -938,22 +988,53 @@ td.delta-better { color: var(--accent); }
 
 .delete-btn:hover { color: var(--danger); }
 
+.heatmap-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 14px;
+  min-width: 0;
+}
+
+.heatmap-axis {
+  display: grid;
+  grid-template-rows: repeat(7, var(--cell));
+  gap: 3px;
+  flex-shrink: 0;
+  padding-top: 0;
+}
+
+.heatmap-axis span {
+  font-size: 0.58rem;
+  line-height: var(--cell);
+  color: var(--text-dim);
+  text-align: right;
+  width: 0.75rem;
+}
+
 .heatmap {
   display: grid;
-  grid-template-rows: repeat(7, 1fr);
+  grid-template-rows: repeat(7, var(--cell));
   grid-auto-flow: column;
   gap: 3px;
-  margin-top: 14px;
   overflow-x: auto;
   padding-bottom: 4px;
+  min-width: 0;
 }
 
 .heat-cell {
-  width: 11px;
-  height: 11px;
+  width: var(--cell);
+  height: var(--cell);
   border-radius: 2px;
   background: var(--heat-empty);
   cursor: pointer;
+}
+
+/* Si el gesto principal es tocar una celda, 11 px es muy chico para el dedo. */
+@media (max-width: 640px) {
+  :root { --cell: 15px; }
+  .heat-cell { border-radius: 3px; }
+  .heatmap-axis span { font-size: 0.62rem; }
 }
 
 .heat-cell.on,
@@ -1066,7 +1147,7 @@ td.delta-better { color: var(--accent); }
             <path class="gauge-fill" id="gaugeFill" d="M 15 80 A 65 65 0 0 1 145 80" pathLength="100"></path>
           </svg>
           <div class="sleep-gauge-value">
-            <span id="sleepQualityValue">5</span><span class="sleep-gauge-max">/10</span>
+            <span id="sleepQualityValue">5</span><span class="sleep-gauge-max" id="sleepGaugeMax">/10</span>
           </div>
         </div>
         <div class="sleep-controls">
@@ -1256,11 +1337,19 @@ td.delta-better { color: var(--accent); }
   <template id="habitTemplate">
     <li class="habit-card">
       <div class="habit-row">
-        <span class="drag-handle" title="Arrastrar para reordenar">⠿</span>
         <button class="check-btn" title="Marcar hoy"></button>
-        <span class="habit-name"></span>
+        <span class="habit-name" title="Tocar para renombrar" role="button" tabindex="0"></span>
         <span class="habit-streak"></span>
-        <button class="delete-btn" title="Eliminar hábito">✕</button>
+        <span class="habit-actions">
+          <button class="move-btn" data-dir="-1" title="Subir" aria-label="Subir">▲</button>
+          <button class="move-btn" data-dir="1" title="Bajar" aria-label="Bajar">▼</button>
+          <button class="delete-btn" title="Eliminar hábito">✕</button>
+        </span>
+      </div>
+      <div class="habit-confirm" hidden>
+        <span class="habit-confirm-text"></span>
+        <button type="button" class="btn-danger confirm-yes">Eliminar</button>
+        <button type="button" class="btn-ghost confirm-no">Cancelar</button>
       </div>
       <div class="heatmap"></div>
     </li>
@@ -1309,6 +1398,7 @@ const sleepQualityInput = document.getElementById("sleepQualityInput");
 const sleepHoursInput = document.getElementById("sleepHoursInput");
 const sleepQualityValue = document.getElementById("sleepQualityValue");
 const gaugeFill = document.getElementById("gaugeFill");
+const sleepGaugeMax = document.getElementById("sleepGaugeMax");
 const sleepStatusEmoji = document.getElementById("sleepStatusEmoji");
 const sleepStatusLabel = document.getElementById("sleepStatusLabel");
 const sleepHeatmap = document.getElementById("sleepHeatmap");
@@ -1571,16 +1661,30 @@ function deleteHabit(id) {
   render();
 }
 
-function reorderHabits(draggedId, targetId) {
-  const fromIndex = state.habits.findIndex((h) => h.id === draggedId);
-  const toIndex = state.habits.findIndex((h) => h.id === targetId);
-  if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return;
-  const [moved] = state.habits.splice(fromIndex, 1);
-  state.habits.splice(toIndex, 0, moved);
+function moveHabit(id, delta) {
+  const from = state.habits.findIndex((h) => h.id === id);
+  const to = from + delta;
+  if (from === -1 || to < 0 || to >= state.habits.length) return;
+  const [moved] = state.habits.splice(from, 1);
+  state.habits.splice(to, 0, moved);
   saveState();
   render();
 }
 
+function renameHabit(id, name) {
+  const habit = state.habits.find((h) => h.id === id);
+  const trimmed = name.trim();
+  if (!habit || !trimmed || trimmed === habit.name) return false;
+  habit.name = trimmed.slice(0, 60);
+  saveState();
+  return true;
+}
+
+/**
+ * Marca o desmarca un día. Sólo toca la celda afectada, el botón del día
+ * activo, la racha y las estadísticas: redibujar la lista entera eran más de
+ * 670 celdas por toque y en el teléfono se sentía lento.
+ */
 function toggleDate(habit, key) {
   if (habit.dates[key]) {
     delete habit.dates[key];
@@ -1588,7 +1692,20 @@ function toggleDate(habit, key) {
     habit.dates[key] = true;
   }
   saveState();
-  render();
+
+  const view = habitViews.get(habit.id);
+  if (!view) {
+    render();
+    return;
+  }
+  const cell = view.cells.get(key);
+  if (cell) {
+    cell.classList.toggle("on", !!habit.dates[key]);
+    cell.title = `${key}${habit.dates[key] ? " ✓" : ""}`;
+  }
+  if (key === activeDate) view.checkBtn.classList.toggle("done", !!habit.dates[key]);
+  updateStreakLabel(view.streakEl, habit);
+  renderStats();
 }
 
 function computeStreak(habit) {
@@ -1625,13 +1742,22 @@ function computeBestStreakAcrossAll() {
   return best;
 }
 
+const WEEKDAY_LABELS = ["L", "M", "X", "J", "V", "S", "D"];
+
+/**
+ * Días del heatmap, alineados al lunes como en GitHub: la primera celda de
+ * cada columna es siempre lunes, así que las siete filas sí corresponden a
+ * días de la semana y el patrón se puede leer. La última columna es la
+ * semana en curso, con hoy dentro.
+ */
 function buildHeatmapDays() {
+  const today = new Date();
+  const mondayOffset = (today.getDay() + 6) % 7; // 0 = lunes
+  const start = new Date(today);
+  start.setDate(today.getDate() - mondayOffset - (WEEKS_VISIBLE - 1) * 7);
+
   const days = [];
-  const totalDays = WEEKS_VISIBLE * 7;
-  const end = new Date();
-  const start = new Date(end);
-  start.setDate(start.getDate() - totalDays + 1);
-  for (let i = 0; i < totalDays; i++) {
+  for (let i = 0; i < WEEKS_VISIBLE * 7; i++) {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
     days.push(d);
@@ -1639,10 +1765,38 @@ function buildHeatmapDays() {
   return days;
 }
 
+/**
+ * Envuelve un heatmap con la columna de etiquetas de día. Idempotente: si el
+ * contenedor ya está envuelto, devuelve el wrap existente.
+ */
+function ensureHeatmapAxis(container) {
+  const parent = container.parentElement;
+  if (parent && parent.classList.contains("heatmap-wrap")) return parent;
+
+  const wrap = document.createElement("div");
+  wrap.className = "heatmap-wrap";
+
+  const axis = document.createElement("div");
+  axis.className = "heatmap-axis";
+  axis.setAttribute("aria-hidden", "true");
+  for (const label of WEEKDAY_LABELS) {
+    const span = document.createElement("span");
+    span.textContent = label;
+    axis.appendChild(span);
+  }
+
+  if (parent) parent.insertBefore(wrap, container);
+  wrap.appendChild(axis);
+  wrap.appendChild(container);
+  return wrap;
+}
+
+/** Devuelve un Map de fecha -> celda, para poder actualizarlas de a una. */
 function renderHeatmap(container, habit) {
+  ensureHeatmapAxis(container);
   container.innerHTML = "";
-  const days = buildHeatmapDays();
-  for (const d of days) {
+  const cells = new Map();
+  for (const d of buildHeatmapDays()) {
     const key = dateKey(d);
     const cell = document.createElement("div");
     cell.className =
@@ -1651,72 +1805,107 @@ function renderHeatmap(container, habit) {
     cell.addEventListener("click", () => {
       // Ver un hueco y llenarlo: marca el día y deja la fecha activa ahí.
       toggleDate(habit, key);
-      setActiveDate(key);
+      if (key !== activeDate) setActiveDate(key);
     });
     container.appendChild(cell);
+    cells.set(key, cell);
   }
+  return cells;
+}
+
+function updateStreakLabel(el, habit) {
+  const streak = computeStreak(habit);
+  el.textContent = streak > 0 ? `🔥 ${streak} día${streak === 1 ? "" : "s"}` : "Sin racha";
+}
+
+/** id de hábito -> nodos vivos de su tarjeta, para actualizarlos sin redibujar. */
+const habitViews = new Map();
+
+function startRename(habit, nameEl) {
+  if (nameEl.isContentEditable) return;
+  nameEl.contentEditable = "true";
+  nameEl.focus();
+
+  const range = document.createRange();
+  range.selectNodeContents(nameEl);
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+
+  const finish = (commit) => {
+    nameEl.contentEditable = "false";
+    nameEl.removeEventListener("blur", onBlur);
+    nameEl.removeEventListener("keydown", onKey);
+    if (commit) renameHabit(habit.id, nameEl.textContent);
+    // Al cancelar, o si el nombre nuevo no era válido, vuelve el que está guardado.
+    nameEl.textContent = habit.name;
+  };
+  const onBlur = () => finish(true);
+  const onKey = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      finish(true);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      finish(false);
+    }
+  };
+
+  nameEl.addEventListener("blur", onBlur);
+  nameEl.addEventListener("keydown", onKey);
 }
 
 function render() {
   habitList.innerHTML = "";
+  habitViews.clear();
   emptyState.style.display = state.habits.length === 0 ? "block" : "none";
 
-  for (const habit of state.habits) {
+  state.habits.forEach((habit, index) => {
     const node = template.content.cloneNode(true);
-    const card = node.querySelector(".habit-card");
-    const dragHandle = node.querySelector(".drag-handle");
     const checkBtn = node.querySelector(".check-btn");
     const nameEl = node.querySelector(".habit-name");
     const streakEl = node.querySelector(".habit-streak");
     const deleteBtn = node.querySelector(".delete-btn");
+    const confirmEl = node.querySelector(".habit-confirm");
+    const confirmText = node.querySelector(".habit-confirm-text");
     const heatmap = node.querySelector(".heatmap");
+    const [upBtn, downBtn] = node.querySelectorAll(".move-btn");
 
     nameEl.textContent = habit.name;
-    const doneOnActive = !!habit.dates[activeDate];
-    checkBtn.classList.toggle("done", doneOnActive);
+    checkBtn.classList.toggle("done", !!habit.dates[activeDate]);
     checkBtn.title = isActiveToday() ? "Marcar hoy" : `Marcar ${activeDate}`;
     checkBtn.addEventListener("click", () => toggleDate(habit, activeDate));
 
-    const streak = computeStreak(habit);
-    streakEl.textContent = streak > 0 ? `🔥 ${streak} día${streak === 1 ? "" : "s"}` : "Sin racha";
+    updateStreakLabel(streakEl, habit);
 
+    nameEl.addEventListener("click", () => startRename(habit, nameEl));
+    nameEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !nameEl.isContentEditable) {
+        e.preventDefault();
+        startRename(habit, nameEl);
+      }
+    });
+
+    upBtn.disabled = index === 0;
+    downBtn.disabled = index === state.habits.length - 1;
+    upBtn.addEventListener("click", () => moveHabit(habit.id, -1));
+    downBtn.addEventListener("click", () => moveHabit(habit.id, 1));
+
+    // Confirmación dentro de la tarjeta: los diálogos modales del navegador
+    // son horribles en móvil.
+    confirmText.textContent = `¿Eliminar "${habit.name}" y todo su historial?`;
     deleteBtn.addEventListener("click", () => {
-      if (confirm(`¿Eliminar "${habit.name}"?`)) deleteHabit(habit.id);
+      confirmEl.hidden = !confirmEl.hidden;
     });
+    node.querySelector(".confirm-no").addEventListener("click", () => {
+      confirmEl.hidden = true;
+    });
+    node.querySelector(".confirm-yes").addEventListener("click", () => deleteHabit(habit.id));
 
-    card.draggable = false;
-    dragHandle.addEventListener("mousedown", () => {
-      card.draggable = true;
-    });
-    card.addEventListener("dragstart", (e) => {
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", habit.id);
-      card.classList.add("dragging");
-    });
-    card.addEventListener("dragend", () => {
-      card.draggable = false;
-      card.classList.remove("dragging");
-    });
-    card.addEventListener("dragenter", (e) => {
-      e.preventDefault();
-      card.classList.add("drag-over");
-    });
-    card.addEventListener("dragleave", () => {
-      card.classList.remove("drag-over");
-    });
-    card.addEventListener("dragover", (e) => {
-      e.preventDefault();
-    });
-    card.addEventListener("drop", (e) => {
-      e.preventDefault();
-      card.classList.remove("drag-over");
-      const draggedId = e.dataTransfer.getData("text/plain");
-      reorderHabits(draggedId, habit.id);
-    });
-
-    renderHeatmap(heatmap, habit);
+    const cells = renderHeatmap(heatmap, habit);
+    habitViews.set(habit.id, { checkBtn, streakEl, cells });
     habitList.appendChild(node);
-  }
+  });
 
   renderStats();
 }
@@ -1795,6 +1984,7 @@ function renderLeg(leg) {
 }
 
 function renderPainHeatmap(container, field) {
+  ensureHeatmapAxis(container);
   container.innerHTML = "";
   const card = document.getElementById("recoveryCard");
   for (const d of buildHeatmapDays()) {
@@ -1909,12 +2099,25 @@ function setSleepHours(value) {
   renderSleep();
 }
 
+/** Puntúa las horas dormidas: 10 dentro de la ventana de 7 a 9 h, bajando 2 por hora fuera. */
+function hoursScore(hours) {
+  const deviation = hours < 7 ? 7 - hours : hours > 9 ? hours - 9 : 0;
+  return Math.max(0, 10 - deviation * 2);
+}
+
+/**
+ * Calcula con lo que haya: sólo horas, sólo calidad, o ambas. Antes devolvía
+ * null en cuanto faltaba la calidad, así que registrar únicamente las horas
+ * dejaba la tarjeta en "Sin datos" aunque sí hubiera dato.
+ */
 function computeSleepScore(entry) {
-  if (!entry || entry.quality == null) return null;
-  if (entry.hours == null) return entry.quality;
-  const deviation = entry.hours < 7 ? 7 - entry.hours : entry.hours > 9 ? entry.hours - 9 : 0;
-  const hoursScore = Math.max(0, 10 - deviation * 2);
-  return (entry.quality + hoursScore) / 2;
+  if (!entry) return null;
+  const hasQuality = entry.quality != null;
+  const hasHours = entry.hours != null;
+  if (!hasQuality && !hasHours) return null;
+  if (!hasHours) return entry.quality;
+  if (!hasQuality) return hoursScore(entry.hours);
+  return (entry.quality + hoursScore(entry.hours)) / 2;
 }
 
 function sleepCategory(score) {
@@ -1926,10 +2129,16 @@ function sleepCategory(score) {
 
 function renderSleep() {
   const entry = getActiveSleep();
-  const quality = entry.quality != null ? entry.quality : 5;
-  sleepQualityValue.textContent = String(quality);
+
+  // Sin calidad registrada el slider queda apagado y el medidor en "—": un 5
+  // pintado como si fuera dato real hacía creer que ya se había capturado.
+  const hasQuality = entry.quality != null;
+  const quality = hasQuality ? entry.quality : 5;
+  sleepQualityValue.textContent = hasQuality ? String(quality) : "—";
   sleepQualityInput.value = String(quality);
-  gaugeFill.style.strokeDasharray = `${quality * 10} 100`;
+  sleepQualityInput.classList.toggle("unset", !hasQuality);
+  sleepGaugeMax.hidden = !hasQuality;
+  gaugeFill.style.strokeDasharray = `${hasQuality ? quality * 10 : 0} 100`;
   sleepHoursInput.value = entry.hours != null ? entry.hours : "";
 
   const category = sleepCategory(computeSleepScore(entry));
@@ -1942,6 +2151,7 @@ function renderSleep() {
 }
 
 function renderSleepHeatmap() {
+  ensureHeatmapAxis(sleepHeatmap);
   sleepHeatmap.innerHTML = "";
   const days = buildHeatmapDays();
   const card = document.getElementById("sleepCard");
