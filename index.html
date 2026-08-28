@@ -682,6 +682,54 @@ table.data tr:last-child td { border-bottom: none; }
   color: var(--accent);
 }
 
+/* ---------- Pruebas de fin de mes ---------- */
+
+.tests-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.tests-grid .field { min-width: 0; }
+
+/* La primera columna se queda fija: sin esto, al hacer scroll lateral en el
+   celular no se sabe qué prueba se está viendo. */
+.tests-table th.test-name,
+.tests-table td.test-name {
+  position: sticky;
+  left: 0;
+  background: var(--surface);
+  z-index: 1;
+  border-right: 1px solid var(--border);
+}
+
+.tests-table th.test-name { z-index: 2; }
+
+.tests-table td.num,
+.tests-table th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tests-table td.nd { color: var(--text-dim); opacity: 0.6; }
+
+/* Mejor marca histórica de la prueba, según su dirección. */
+.tests-table td.best {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.tests-table td.up { color: var(--accent); }
+.tests-table td.down { color: var(--danger); }
+
+.tests-table th.summary-col,
+.tests-table td.summary-col {
+  border-left: 1px solid var(--border);
+}
+
+.summary-value.warn { color: var(--warn); }
+
 .sleep-top {
   display: flex;
   align-items: center;
@@ -1275,6 +1323,45 @@ table.data tr:last-child td { border-bottom: none; }
         <table class="data" id="marksTable"></table>
       </div>
     </section>
+
+    <section class="card" id="testsCard">
+      <h2 class="card-title">📐 Pruebas de fin de mes</h2>
+      <p class="muted" style="margin: -8px 0 16px;">
+        La batería de doce pruebas de la quinta semana. Es independiente del módulo de marcas:
+        allí van los tramos sueltos de entrenamiento y competencia.
+      </p>
+
+      <div class="summary-cards">
+        <div class="summary-card" id="asymmetryCard">
+          <span class="summary-value none" id="asymmetryValue">—</span>
+          <span class="summary-label" id="asymmetryLabel">Asimetría triple izq/der</span>
+        </div>
+      </div>
+      <p class="muted" id="asymmetryNote" style="font-size: 0.76rem; margin: -8px 0 20px;">
+        El 10 % es una referencia habitual para asimetría entre piernas, no una regla dura.
+        Coméntalo con tu fisio antes de sacar conclusiones.
+      </p>
+
+      <form id="testsForm">
+        <div class="field-row">
+          <div class="field" style="max-width: 220px;">
+            <label class="field-label" for="testMonthInput">Mes</label>
+            <input type="month" id="testMonthInput" required>
+          </div>
+        </div>
+
+        <div class="tests-grid" id="testsInputs"></div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Guardar mes</button>
+          <span class="muted" id="testsFormHint"></span>
+        </div>
+      </form>
+
+      <div class="table-wrap" style="margin-top: 24px;">
+        <table class="data tests-table" id="testsTable"></table>
+      </div>
+    </section>
     </div>
 
     <div class="tab-panel" data-panel="resumen" hidden>
@@ -1325,10 +1412,11 @@ table.data tr:last-child td { border-bottom: none; }
   </template>
 
 <script>
-const STORAGE_KEY_V1 = "habit-tracker-data-v1";
-const STORAGE_KEY = "habit-tracker-data-v2";
+const STORAGE_KEY = "habit-tracker-data-v3";
+/** Llaves de esquemas anteriores, de la más reciente a la más antigua. */
+const LEGACY_KEYS = ["habit-tracker-data-v2", "habit-tracker-data-v1"];
 const BACKUP_PREFIX = "habit-tracker-backup-";
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const THEME_KEY = "habit-tracker-theme";
 const WEEKS_VISIBLE = 26;
 
@@ -1418,6 +1506,7 @@ function createEmptyState() {
     gym: [],
     marks: [],
     races: [],
+    tests: {},
   };
 }
 
@@ -1446,6 +1535,7 @@ function normalizeState(input) {
   if (Array.isArray(input.gym)) out.gym = input.gym.filter(isPlainObject);
   if (Array.isArray(input.marks)) out.marks = input.marks.filter(isPlainObject);
   if (Array.isArray(input.races)) out.races = input.races.filter(isPlainObject);
+  if (isPlainObject(input.tests)) out.tests = input.tests;
 
   return out;
 }
@@ -1457,11 +1547,13 @@ function backupCorrupt(sourceKey, raw) {
 }
 
 /**
- * Migra habit-tracker-data-v1 a v2. La llave v1 NO se borra ni se sobrescribe:
- * queda como respaldo de los datos ya capturados.
+ * Migra un estado de un esquema anterior al actual. normalizeState() agrega
+ * vacías las colecciones que ese esquema no tenía, así que la misma función
+ * sirve para v1→v3 y para v2→v3. La llave de origen NO se borra ni se
+ * sobrescribe: queda como respaldo de los datos ya capturados.
  */
-function migrateFromV1(rawV1) {
-  const migrated = normalizeState(JSON.parse(rawV1));
+function migrateLegacy(legacyRaw) {
+  const migrated = normalizeState(JSON.parse(legacyRaw));
   migrated.schemaVersion = SCHEMA_VERSION;
   writeRaw(STORAGE_KEY, JSON.stringify(migrated));
   return migrated;
@@ -1478,12 +1570,12 @@ function seedDefaultHabits(target) {
 }
 
 function loadState() {
-  const rawV2 = readRaw(STORAGE_KEY);
-  if (rawV2 != null) {
+  const raw = readRaw(STORAGE_KEY);
+  if (raw != null) {
     try {
-      return normalizeState(JSON.parse(rawV2));
+      return normalizeState(JSON.parse(raw));
     } catch (e) {
-      backupCorrupt(STORAGE_KEY, rawV2);
+      backupCorrupt(STORAGE_KEY, raw);
       showNotice(
         "Los datos guardados estaban dañados y no se pudieron leer. Se guardó una copia del texto original y la página arrancó vacía.",
         "warn"
@@ -1492,17 +1584,20 @@ function loadState() {
     }
   }
 
-  const rawV1 = readRaw(STORAGE_KEY_V1);
-  if (rawV1 != null) {
+  // Migrar desde el esquema anterior más reciente que exista. Ninguna llave
+  // vieja se borra ni se sobrescribe: v1 y v2 quedan como respaldo.
+  for (const legacyKey of LEGACY_KEYS) {
+    const legacyRaw = readRaw(legacyKey);
+    if (legacyRaw == null) continue;
     try {
-      const migrated = migrateFromV1(rawV1);
+      const migrated = migrateLegacy(legacyRaw);
       showNotice(
-        "Datos migrados a la versión 2. La copia anterior sigue guardada como respaldo.",
+        `Datos migrados a la versión ${SCHEMA_VERSION}. Las copias anteriores siguen guardadas como respaldo.`,
         "ok"
       );
       return migrated;
     } catch (e) {
-      backupCorrupt(STORAGE_KEY_V1, rawV1);
+      backupCorrupt(legacyKey, legacyRaw);
       showNotice(
         "No se pudo migrar el respaldo anterior porque estaba dañado. Se guardó una copia del texto original y la página arrancó vacía.",
         "warn"
@@ -1511,7 +1606,7 @@ function loadState() {
     }
   }
 
-  // Primer arranque de verdad: no hay ni v2 ni v1 que migrar.
+  // Primer arranque de verdad: no hay ningún esquema previo que migrar.
   const fresh = seedDefaultHabits(createEmptyState());
   writeRaw(STORAGE_KEY, JSON.stringify(fresh));
   return fresh;
@@ -1571,6 +1666,7 @@ function renderAll() {
   renderGym();
   markDateInput.value = activeDate;
   renderMarks();
+  renderTests();
   renderSummary();
 }
 
@@ -2691,6 +2787,326 @@ markForm.addEventListener("submit", (e) => {
   addMark();
 });
 
+/* ---------- Pruebas de fin de mes ---------- */
+
+/**
+ * Las doce pruebas de la quinta semana. `better` es la dirección: en 40 m
+ * bajar de 5.60 a 5.45 es una mejora, y en sentadilla subir de 100 a 110 kg
+ * también. Tratar "más grande" como "mejor" sería un error en la mitad de las
+ * filas, así que la dirección vive aquí y la usan tanto el resaltado de la
+ * mejor marca como la columna de diferencia.
+ */
+const MONTHLY_TESTS = [
+  { id: "m40", name: "40 m", unit: "s", format: "sprint", better: "lower" },
+  { id: "m60", name: "60 m", unit: "s", format: "sprint", better: "lower" },
+  { id: "m600", name: "600 m", unit: "m:ss.d", format: "duration", better: "lower" },
+  { id: "m1000", name: "1000 m", unit: "m:ss.d", format: "duration", better: "lower" },
+  { id: "saltoSI", name: "Salto sin impulso", unit: "m", format: "meters", better: "higher" },
+  { id: "tripleIzq", name: "Triple izquierdo", unit: "m", format: "meters", better: "higher" },
+  { id: "tripleDer", name: "Triple derecho", unit: "m", format: "meters", better: "higher" },
+  { id: "quintuple", name: "Quíntuple", unit: "m", format: "meters", better: "higher" },
+  { id: "pecho", name: "Pecho", unit: "kg", format: "kg", better: "higher" },
+  { id: "sentadilla", name: "Sentadilla", unit: "kg", format: "kg", better: "higher" },
+  { id: "clean", name: "Clean", unit: "kg", format: "kg", better: "higher" },
+  { id: "arranque", name: "Arranque", unit: "kg", format: "kg", better: "higher" },
+];
+
+/** Umbral de asimetría entre piernas, en porcentaje. */
+const ASYMMETRY_THRESHOLD = 10;
+
+const testsForm = document.getElementById("testsForm");
+const testMonthInput = document.getElementById("testMonthInput");
+const testsInputs = document.getElementById("testsInputs");
+const testsFormHint = document.getElementById("testsFormHint");
+const testsTable = document.getElementById("testsTable");
+const asymmetryValue = document.getElementById("asymmetryValue");
+const asymmetryLabel = document.getElementById("asymmetryLabel");
+
+function monthKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * Acepta "1:32.5" y "92.5" y devuelve segundos. Los tiempos de 600 y 1000 son
+ * de minutos: escribirlos en segundos es antinatural.
+ */
+function parseDuration(raw) {
+  const text = String(raw).trim().replace(",", ".");
+  if (!text) return null;
+  if (text.indexOf(":") !== -1) {
+    const [minPart, secPart] = text.split(":");
+    const minutes = Number(minPart);
+    const seconds = Number(secPart);
+    if (!isFinite(minutes) || !isFinite(seconds)) return null;
+    return minutes * 60 + seconds;
+  }
+  const value = Number(text);
+  return isFinite(value) ? value : null;
+}
+
+function parseTestValue(test, raw) {
+  if (test.format === "duration") return parseDuration(raw);
+  const text = String(raw).trim().replace(",", ".");
+  if (!text) return null;
+  const value = Number(text);
+  return isFinite(value) ? value : null;
+}
+
+function formatDuration(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds - minutes * 60;
+  return `${minutes}:${rest.toFixed(1).padStart(4, "0")}`;
+}
+
+function formatTestValue(test, value) {
+  if (value == null) return "ND";
+  if (test.format === "duration") return formatDuration(value);
+  if (test.format === "kg") return String(Math.round(value));
+  return value.toFixed(2);
+}
+
+/** Diferencia con signo. En las pruebas de tiempo se lee mejor en segundos. */
+function formatTestDelta(test, delta) {
+  const magnitude = Math.abs(delta);
+  const text =
+    test.format === "kg"
+      ? String(Math.round(magnitude))
+      : test.format === "duration"
+      ? magnitude.toFixed(1)
+      : magnitude.toFixed(2);
+  return `${delta < 0 ? "−" : "+"}${text}`;
+}
+
+function isImprovement(test, delta) {
+  return test.better === "lower" ? delta < 0 : delta > 0;
+}
+
+/** Meses con registro, en orden cronológico. */
+function testMonths() {
+  return Object.keys(state.tests).sort();
+}
+
+function testValue(month, test) {
+  const entry = state.tests[month];
+  if (!entry) return null;
+  const value = entry[test.id];
+  return typeof value === "number" && isFinite(value) ? value : null;
+}
+
+/** Mejor marca histórica de una prueba, respetando su dirección. */
+function bestTest(test) {
+  let best = null;
+  for (const month of testMonths()) {
+    const value = testValue(month, test);
+    if (value == null) continue;
+    if (best == null || (test.better === "lower" ? value < best.value : value > best.value)) {
+      best = { month, value };
+    }
+  }
+  return best;
+}
+
+/** Los dos meses más recientes con registro de esa prueba. */
+function lastTwoWithValue(test) {
+  const months = testMonths().filter((month) => testValue(month, test) != null);
+  return {
+    current: months.length ? months[months.length - 1] : null,
+    previous: months.length > 1 ? months[months.length - 2] : null,
+  };
+}
+
+(function buildTestInputs() {
+  for (const test of MONTHLY_TESTS) {
+    const field = document.createElement("div");
+    field.className = "field";
+
+    const label = document.createElement("label");
+    label.className = "field-label";
+    label.textContent = `${test.name} (${test.unit})`;
+    label.setAttribute("for", `testInput-${test.id}`);
+
+    const input = document.createElement("input");
+    input.id = `testInput-${test.id}`;
+    if (test.format === "duration") {
+      // Texto, para poder escribir "1:32.5" además de "92.5".
+      input.type = "text";
+      input.inputMode = "decimal";
+      input.placeholder = "1:32.5 o 92.5";
+    } else {
+      input.type = "number";
+      input.min = "0";
+      input.step = test.format === "kg" ? "1" : "0.01";
+      input.placeholder = test.format === "kg" ? "kg" : test.unit;
+    }
+
+    field.appendChild(label);
+    field.appendChild(input);
+    testsInputs.appendChild(field);
+  }
+})();
+
+/** Precarga el formulario con lo capturado ese mes, para poder corregirlo. */
+function loadMonthIntoForm() {
+  const entry = state.tests[testMonthInput.value] || {};
+  for (const test of MONTHLY_TESTS) {
+    const input = document.getElementById(`testInput-${test.id}`);
+    const value = typeof entry[test.id] === "number" ? entry[test.id] : null;
+    input.value = value == null ? "" : test.format === "duration" ? formatDuration(value) : String(value);
+  }
+}
+
+function saveTestMonth() {
+  const month = testMonthInput.value;
+  if (!month) {
+    testsFormHint.textContent = "Elige el mes.";
+    return;
+  }
+
+  const entry = {};
+  for (const test of MONTHLY_TESTS) {
+    const raw = document.getElementById(`testInput-${test.id}`).value;
+    const value = parseTestValue(test, raw);
+    // Un campo vacío significa que esa prueba no se hizo ese mes: no se inventa un cero.
+    if (value != null) entry[test.id] = value;
+  }
+
+  if (!Object.keys(entry).length) {
+    testsFormHint.textContent = "Captura al menos una prueba.";
+    return;
+  }
+
+  // Reemplaza el mes en vez de duplicarlo.
+  state.tests[month] = entry;
+  saveState();
+  testsFormHint.textContent = `Mes ${month} guardado.`;
+  renderTests();
+}
+
+/**
+ * Diferencia porcentual entre triple izquierdo y derecho, sobre la pierna más
+ * fuerte, en el mes más reciente que tenga ambos.
+ */
+function computeAsymmetry() {
+  const left = MONTHLY_TESTS.find((t) => t.id === "tripleIzq");
+  const right = MONTHLY_TESTS.find((t) => t.id === "tripleDer");
+  const months = testMonths().reverse();
+  for (const month of months) {
+    const l = testValue(month, left);
+    const r = testValue(month, right);
+    if (l == null || r == null) continue;
+    const strongest = Math.max(l, r);
+    if (strongest <= 0) continue;
+    return { month, percent: (Math.abs(l - r) / strongest) * 100, left: l, right: r };
+  }
+  return null;
+}
+
+function renderAsymmetry() {
+  const asymmetry = computeAsymmetry();
+  if (!asymmetry) {
+    asymmetryValue.textContent = "—";
+    asymmetryValue.className = "summary-value none";
+    asymmetryLabel.textContent = "Asimetría triple izq/der";
+    return;
+  }
+  // Se compara el valor ya redondeado, el mismo que se muestra: 7.20 contra
+  // 8.00 da 9.999999999999998 por coma flotante, y sería absurdo pintar
+  // "10.0 %" sin la advertencia.
+  const shown = Number(asymmetry.percent.toFixed(1));
+  asymmetryValue.textContent = `${shown.toFixed(1)} %`;
+  asymmetryValue.className = "summary-value" + (shown >= ASYMMETRY_THRESHOLD ? " warn" : "");
+  asymmetryLabel.textContent = `Asimetría triple izq/der · ${asymmetry.month}`;
+}
+
+function renderTestsTable() {
+  testsTable.innerHTML = "";
+  const months = testMonths();
+
+  const head = document.createElement("thead");
+  const headRow = document.createElement("tr");
+
+  const nameHead = document.createElement("th");
+  nameHead.className = "test-name";
+  nameHead.textContent = "Prueba";
+  headRow.appendChild(nameHead);
+
+  for (const month of months) {
+    const th = document.createElement("th");
+    th.className = "num";
+    th.textContent = month;
+    headRow.appendChild(th);
+  }
+  for (const label of ["vs mes anterior", "Mejor"]) {
+    const th = document.createElement("th");
+    th.className = "num summary-col";
+    th.textContent = label;
+    headRow.appendChild(th);
+  }
+  head.appendChild(headRow);
+  testsTable.appendChild(head);
+
+  const body = document.createElement("tbody");
+  for (const test of MONTHLY_TESTS) {
+    const tr = document.createElement("tr");
+
+    const name = document.createElement("td");
+    name.className = "test-name";
+    name.textContent = `${test.name} (${test.unit})`;
+    tr.appendChild(name);
+
+    const best = bestTest(test);
+    for (const month of months) {
+      const value = testValue(month, test);
+      const td = document.createElement("td");
+      td.className = "num" + (value == null ? " nd" : "") + (best && best.month === month ? " best" : "");
+      td.textContent = formatTestValue(test, value);
+      tr.appendChild(td);
+    }
+
+    const { current, previous } = lastTwoWithValue(test);
+    const deltaCell = document.createElement("td");
+    deltaCell.className = "num summary-col";
+    if (current && previous) {
+      const delta = testValue(current, test) - testValue(previous, test);
+      deltaCell.textContent = formatTestDelta(test, delta);
+      deltaCell.classList.add(isImprovement(test, delta) ? "up" : "down");
+      deltaCell.title = `${previous} → ${current}`;
+    } else {
+      deltaCell.textContent = "ND";
+      deltaCell.classList.add("nd");
+    }
+    tr.appendChild(deltaCell);
+
+    const bestCell = document.createElement("td");
+    bestCell.className = "num summary-col";
+    if (best) {
+      bestCell.textContent = `${formatTestValue(test, best.value)} (${best.month})`;
+    } else {
+      bestCell.textContent = "ND";
+      bestCell.classList.add("nd");
+    }
+    tr.appendChild(bestCell);
+
+    body.appendChild(tr);
+  }
+  testsTable.appendChild(body);
+}
+
+function renderTests() {
+  renderTestsTable();
+  renderAsymmetry();
+}
+
+testMonthInput.addEventListener("change", () => {
+  testsFormHint.textContent = "";
+  loadMonthIntoForm();
+});
+
+testsForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  saveTestMonth();
+});
+
 /* ---------- Touchdown times ---------- */
 
 /**
@@ -2883,7 +3299,7 @@ function exportState() {
 function validateImported(data) {
   if (!isPlainObject(data)) return "El archivo no contiene un objeto JSON.";
   if (!Array.isArray(data.habits)) return "Al archivo le falta la lista de hábitos.";
-  const objectFields = ["sleep", "recovery"];
+  const objectFields = ["sleep", "recovery", "tests"];
   for (const field of objectFields) {
     if (data[field] !== undefined && !isPlainObject(data[field])) {
       return `El campo "${field}" no tiene la forma esperada.`;
@@ -2910,6 +3326,7 @@ function describeState(candidate) {
     plural(candidate.gym.length, "sesión de gimnasio", "sesiones de gimnasio"),
     plural(candidate.marks.length, "marca", "marcas"),
     plural(candidate.races.length, "carrera", "carreras"),
+    plural(Object.keys(candidate.tests).length, "mes de pruebas", "meses de pruebas"),
   ].join(", ");
 }
 
@@ -3017,6 +3434,8 @@ themeToggle.addEventListener("click", () => {
 })();
 
 renderDraftSets();
+testMonthInput.value = monthKey(new Date());
+loadMonthIntoForm();
 renderAll();
 </script>
 </body>
