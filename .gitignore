@@ -1,0 +1,8 @@
+# Respaldos exportados desde la página: contienen datos personales
+# de entrenamiento, sueño y molestias. No deben subirse al repositorio.
+entrenamiento-*.json
+
+# Ruido de herramientas
+.Rhistory
+.DS_Store
+Thumbs.db
