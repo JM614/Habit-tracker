@@ -107,6 +107,17 @@ h1 {
   color: var(--accent);
 }
 
+/* Confirmación en línea, para no depender de los diálogos del navegador. */
+.notice.confirm {
+  border-color: var(--sleep-mid);
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .date-bar {
   display: flex;
   align-items: center;
@@ -976,11 +987,23 @@ td.delta-better { color: var(--accent); }
     <header>
       <h1>Mis Hábitos</h1>
       <div class="header-actions">
+        <button id="exportBtn" class="icon-btn" title="Exportar datos" aria-label="Exportar datos">⬇️</button>
+        <button id="importBtn" class="icon-btn" title="Importar datos" aria-label="Importar datos">⬆️</button>
         <button id="themeToggle" class="icon-btn" title="Cambiar tema">🌙</button>
       </div>
     </header>
 
+    <input type="file" id="importFile" accept="application/json,.json" hidden>
+
     <div id="notice" class="notice" hidden></div>
+
+    <div id="importConfirm" class="notice confirm" hidden>
+      <p id="importSummary" style="margin: 0 0 12px;"></p>
+      <div class="confirm-actions">
+        <button type="button" class="btn-primary" id="importAcceptBtn">Reemplazar mis datos</button>
+        <button type="button" class="btn-ghost" id="importCancelBtn">Cancelar</button>
+      </div>
+    </div>
 
     <section class="date-bar">
       <button class="icon-btn" id="prevDayBtn" title="Día anterior" aria-label="Día anterior">‹</button>
@@ -1479,9 +1502,8 @@ function formatLongDate(key) {
   });
 }
 
-function setActiveDate(key) {
-  const max = todayKey();
-  activeDate = key > max ? max : key;
+/** Redibuja la página entera desde el estado y la fecha activa. */
+function renderAll() {
   renderDateBar();
   render();
   renderRecovery();
@@ -1492,6 +1514,12 @@ function setActiveDate(key) {
   renderMarks();
   raceDateInput.value = activeDate;
   renderRaces();
+}
+
+function setActiveDate(key) {
+  const max = todayKey();
+  activeDate = key > max ? max : key;
+  renderAll();
 }
 
 /** Salta a un día desde un heatmap y lleva la vista a la tarjeta de captura. */
@@ -2754,6 +2782,126 @@ addForm.addEventListener("submit", (e) => {
   habitInput.focus();
 });
 
+/* ---------- Exportar e importar ---------- */
+
+const exportBtn = document.getElementById("exportBtn");
+const importBtn = document.getElementById("importBtn");
+const importFile = document.getElementById("importFile");
+const importConfirm = document.getElementById("importConfirm");
+const importSummary = document.getElementById("importSummary");
+const importAcceptBtn = document.getElementById("importAcceptBtn");
+const importCancelBtn = document.getElementById("importCancelBtn");
+
+/** Estado pendiente de confirmación mientras el panel está abierto. */
+let pendingImport = null;
+
+function exportState() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `entrenamiento-${todayKey()}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Revocar en el siguiente tick: Safari cancela la descarga si se hace antes.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+  showNotice(`Datos exportados como entrenamiento-${todayKey()}.json`, "ok");
+}
+
+/** Valida que el archivo tenga la forma esperada antes de tocar nada. */
+function validateImported(data) {
+  if (!isPlainObject(data)) return "El archivo no contiene un objeto JSON.";
+  if (!Array.isArray(data.habits)) return "Al archivo le falta la lista de hábitos.";
+  const objectFields = ["sleep", "recovery"];
+  for (const field of objectFields) {
+    if (data[field] !== undefined && !isPlainObject(data[field])) {
+      return `El campo "${field}" no tiene la forma esperada.`;
+    }
+  }
+  const arrayFields = ["gym", "marks", "races"];
+  for (const field of arrayFields) {
+    if (data[field] !== undefined && !Array.isArray(data[field])) {
+      return `El campo "${field}" no tiene la forma esperada.`;
+    }
+  }
+  return null;
+}
+
+function plural(count, singular, pluralForm) {
+  return `${count} ${count === 1 ? singular : pluralForm}`;
+}
+
+function describeState(candidate) {
+  return [
+    plural(candidate.habits.length, "hábito", "hábitos"),
+    plural(Object.keys(candidate.sleep).length, "día de sueño", "días de sueño"),
+    plural(Object.keys(candidate.recovery).length, "día de molestia", "días de molestia"),
+    plural(candidate.gym.length, "sesión de gimnasio", "sesiones de gimnasio"),
+    plural(candidate.marks.length, "marca", "marcas"),
+    plural(candidate.races.length, "carrera", "carreras"),
+  ].join(", ");
+}
+
+function closeImportConfirm() {
+  pendingImport = null;
+  importConfirm.hidden = true;
+  importFile.value = "";
+}
+
+function readImportFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let parsed;
+    try {
+      parsed = JSON.parse(String(reader.result));
+    } catch (e) {
+      showNotice("El archivo no es un JSON válido. No se cambió nada.", "warn");
+      importFile.value = "";
+      return;
+    }
+    const problem = validateImported(parsed);
+    if (problem) {
+      showNotice(`${problem} No se cambió nada.`, "warn");
+      importFile.value = "";
+      return;
+    }
+    pendingImport = normalizeState(parsed);
+    importSummary.textContent =
+      `El archivo trae ${describeState(pendingImport)}. ` +
+      `Esto reemplaza por completo lo que tienes ahora (${describeState(state)}).`;
+    importConfirm.hidden = false;
+    importConfirm.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+  reader.onerror = () => {
+    showNotice("No se pudo leer el archivo. No se cambió nada.", "warn");
+    importFile.value = "";
+  };
+  reader.readAsText(file);
+}
+
+function applyImport() {
+  if (!pendingImport) return;
+  for (const key of Object.keys(state)) delete state[key];
+  Object.assign(state, pendingImport);
+  saveState();
+  closeImportConfirm();
+  showNotice("Datos importados.", "ok");
+  renderAll();
+}
+
+exportBtn.addEventListener("click", exportState);
+importBtn.addEventListener("click", () => importFile.click());
+importFile.addEventListener("change", (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (file) readImportFile(file);
+});
+importAcceptBtn.addEventListener("click", applyImport);
+importCancelBtn.addEventListener("click", () => {
+  closeImportConfirm();
+  showNotice("Importación cancelada. No se cambió nada.", null);
+});
+
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
   themeToggle.textContent = theme === "dark" ? "☀️" : "🌙";
@@ -2776,17 +2924,8 @@ themeToggle.addEventListener("click", () => {
   applyTheme(saved || (prefersDark ? "dark" : "light"));
 })();
 
-renderDateBar();
-render();
-renderRecovery();
-renderSleep();
-gymDateInput.value = activeDate;
 renderDraftSets();
-renderGym();
-markDateInput.value = activeDate;
-renderMarks();
-raceDateInput.value = activeDate;
-renderRaces();
+renderAll();
 </script>
 </body>
 </html>
