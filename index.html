@@ -1332,6 +1332,13 @@ td.delta-better { color: var(--accent); }
         </div>
       </div>
     </section>
+
+    <section class="card" id="summaryCard">
+      <h2 class="card-title">📋 Resumen de los últimos 7 días</h2>
+      <p class="muted" id="summaryRange" style="margin: -8px 0 16px;"></p>
+      <div class="summary-cards" id="summaryGrid"></div>
+      <div class="banner orange" id="sleepWarning" hidden></div>
+    </section>
   </div>
 
   <template id="habitTemplate">
@@ -1604,6 +1611,7 @@ function renderAll() {
   renderMarks();
   raceDateInput.value = activeDate;
   renderRaces();
+  renderSummary();
 }
 
 function setActiveDate(key) {
@@ -1923,10 +1931,10 @@ const LEGS = [
  * la ausencia se representa siempre con null, nunca con 0.
  */
 const PAIN_SCALE = [
-  { max: 2, cls: "pain-none", label: "sin molestia" },
-  { max: 4, cls: "pain-low", label: "tensión leve" },
-  { max: 6, cls: "pain-mid", label: "molestia" },
-  { max: 10, cls: "pain-high", label: "dolor" },
+  { max: 2, cls: "pain-none", token: "--accent", label: "sin molestia" },
+  { max: 4, cls: "pain-low", token: "--sleep-mid", label: "tensión leve" },
+  { max: 6, cls: "pain-mid", token: "--warn", label: "molestia" },
+  { max: 10, cls: "pain-high", token: "--danger", label: "dolor" },
 ];
 
 function painLevel(value) {
@@ -2991,6 +2999,121 @@ addForm.addEventListener("submit", (e) => {
   habitInput.value = "";
   habitInput.focus();
 });
+
+/* ---------- Resumen semanal ---------- */
+
+const SUMMARY_DAYS = 7;
+const MIN_SLEEP_HOURS = 7;
+
+const summaryGrid = document.getElementById("summaryGrid");
+const summaryRange = document.getElementById("summaryRange");
+const sleepWarning = document.getElementById("sleepWarning");
+
+/** Las claves de los últimos 7 días terminando en la fecha activa. */
+function summaryWindow() {
+  const keys = [];
+  for (let i = SUMMARY_DAYS - 1; i >= 0; i--) keys.push(shiftKey(activeDate, -i));
+  return keys;
+}
+
+function computeWeeklySummary() {
+  const keys = summaryWindow();
+
+  const slots = state.habits.length * keys.length;
+  const done = state.habits.reduce(
+    (total, habit) => total + keys.filter((key) => habit.dates[key]).length,
+    0
+  );
+  const habitPct = slots === 0 ? null : Math.round((done / slots) * 100);
+
+  const hours = keys
+    .map((key) => (state.sleep[key] ? state.sleep[key].hours : null))
+    .filter((value) => typeof value === "number" && isFinite(value));
+  const avgHours = hours.length ? hours.reduce((a, b) => a + b, 0) / hours.length : null;
+
+  const maxPain = {};
+  for (const leg of LEGS) {
+    const values = keys.map((key) => getPain(key, leg.field)).filter((value) => value != null);
+    maxPain[leg.field] = values.length ? Math.max(...values) : null;
+  }
+
+  const gymSessions = state.gym.filter((s) => keys.indexOf(s.date) !== -1);
+  const preventionDone = new Set(
+    gymSessions.filter((s) => isPreventionExercise(s.exercise)).map((s) => s.exercise)
+  );
+
+  return {
+    keys,
+    habitPct,
+    avgHours,
+    sleepNights: hours.length,
+    maxPain,
+    gymCount: gymSessions.length,
+    preventionCount: preventionDone.size,
+  };
+}
+
+function summaryTile(value, label, tone) {
+  const card = document.createElement("div");
+  card.className = "summary-card";
+
+  const valueEl = document.createElement("span");
+  valueEl.className = "summary-value" + (value == null ? " none" : "");
+  valueEl.textContent = value == null ? "—" : value;
+  if (tone) valueEl.style.color = tone;
+  card.appendChild(valueEl);
+
+  const labelEl = document.createElement("span");
+  labelEl.className = "summary-label";
+  labelEl.textContent = label;
+  card.appendChild(labelEl);
+
+  return card;
+}
+
+function renderSummary() {
+  const s = computeWeeklySummary();
+  summaryRange.textContent = `${s.keys[0]} → ${s.keys[s.keys.length - 1]}`;
+
+  summaryGrid.innerHTML = "";
+  summaryGrid.appendChild(
+    summaryTile(s.habitPct == null ? null : `${s.habitPct}%`, "Cumplimiento de hábitos")
+  );
+  summaryGrid.appendChild(
+    summaryTile(
+      s.avgHours == null ? null : `${s.avgHours.toFixed(1)} h`,
+      s.sleepNights ? `Sueño promedio (${s.sleepNights} noches)` : "Sueño promedio"
+    )
+  );
+
+  for (const leg of LEGS) {
+    const value = s.maxPain[leg.field];
+    const level = value == null ? null : painLevel(value);
+    summaryGrid.appendChild(
+      summaryTile(
+        value == null ? null : `${value}/10`,
+        `Molestia máx. ${leg.short}`,
+        level ? `var(${level.token})` : null
+      )
+    );
+  }
+
+  summaryGrid.appendChild(summaryTile(String(s.gymCount), "Sesiones de gimnasio"));
+  summaryGrid.appendChild(
+    summaryTile(
+      `${s.preventionCount}/${PREVENTION_EXERCISES.length}`,
+      "Ejercicios de prevención"
+    )
+  );
+
+  const lowSleep = s.avgHours != null && s.avgHours < MIN_SLEEP_HOURS;
+  sleepWarning.hidden = !lowSleep;
+  if (lowSleep) {
+    sleepWarning.textContent =
+      `Promedio de ${s.avgHours.toFixed(1)} h de sueño en los últimos 7 días, ` +
+      `por debajo de las ${MIN_SLEEP_HOURS} h. Dormir poco es factor de riesgo de desgarre.`;
+  }
+}
 
 /* ---------- Exportar e importar ---------- */
 
