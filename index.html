@@ -38,6 +38,9 @@
 
 * { box-sizing: border-box; }
 
+/* El display de las clases de layout gana al [hidden] del navegador. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -313,6 +316,225 @@ h1 {
 .heat-cell.pain-low { background: var(--sleep-mid); }
 .heat-cell.pain-mid { background: var(--warn); }
 .heat-cell.pain-high { background: var(--danger); }
+
+/* ---------- Formularios compartidos ---------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 130px;
+}
+
+.field-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.field input,
+.field select {
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.95rem;
+  width: 100%;
+}
+
+.field input:focus,
+.field select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.field-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.btn-primary {
+  padding: 12px 18px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.btn-primary:hover { filter: brightness(1.05); }
+
+.btn-small {
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-small:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ---------- Bitácora de gimnasio ---------- */
+
+.prevention-counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.prevention-counter.incomplete {
+  border-color: var(--sleep-mid);
+  color: var(--sleep-mid);
+  background: transparent;
+}
+
+.prevention-tag {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+
+.set-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  margin-bottom: 8px;
+}
+
+.set-index {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  padding-bottom: 12px;
+  width: 26px;
+  flex-shrink: 0;
+}
+
+.set-remove {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 11px 6px;
+}
+
+.set-remove:hover { color: var(--danger); }
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.accordion {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.accordion > summary {
+  cursor: pointer;
+  padding: 13px 14px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  list-style: none;
+}
+
+.accordion > summary::-webkit-details-marker { display: none; }
+
+.accordion > summary::before {
+  content: "▸";
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.accordion[open] > summary::before { content: "▾"; }
+
+.accordion-count {
+  margin-left: auto;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.accordion-body {
+  padding: 0 14px 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.session-meta {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.session-sets {
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.best-tonnage {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+
+.sparkline {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  height: 46px;
+  overflow: visible;
+}
+
+.sparkline-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sparkline-dot { fill: var(--accent); }
+
+.muted {
+  color: var(--text-dim);
+  font-size: 0.88rem;
+}
 
 .sleep-top {
   display: flex;
@@ -704,6 +926,48 @@ h1 {
     <ul id="habitList" class="habit-list"></ul>
 
     <p id="emptyState" class="empty-state">Aún no tienes hábitos. ¡Añade el primero arriba! 👆</p>
+
+    <section class="card" id="gymCard">
+      <h2 class="card-title">🏋️ Bitácora de gimnasio</h2>
+      <div class="prevention-counter" id="preventionCounter">Prevención esta semana: 0/4</div>
+
+      <form id="gymForm">
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="gymDateInput">Fecha</label>
+            <input type="date" id="gymDateInput" required>
+          </div>
+          <div class="field">
+            <label class="field-label" for="gymExerciseSelect">Ejercicio</label>
+            <select id="gymExerciseSelect"></select>
+          </div>
+        </div>
+
+        <div class="field-row" id="gymOtherRow" hidden>
+          <div class="field">
+            <label class="field-label" for="gymExerciseOther">Nombre del ejercicio</label>
+            <input type="text" id="gymExerciseOther" maxlength="60" placeholder="ej. Sentadilla búlgara con mancuerna">
+          </div>
+        </div>
+
+        <div id="gymSets"></div>
+        <button type="button" class="btn-small" id="addSetBtn">+ serie</button>
+
+        <div class="field-row" style="margin-top: 14px;">
+          <div class="field">
+            <label class="field-label" for="gymNotesInput">Notas (opcional)</label>
+            <input type="text" id="gymNotesInput" maxlength="120" placeholder="ej. sensación pesada en la última serie">
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Guardar sesión</button>
+          <span class="muted" id="gymFormHint"></span>
+        </div>
+      </form>
+
+      <div id="gymHistory" style="margin-top: 24px;"></div>
+    </section>
   </div>
 
   <template id="habitTemplate">
@@ -933,6 +1197,8 @@ function setActiveDate(key) {
   render();
   renderRecovery();
   renderSleep();
+  gymDateInput.value = activeDate;
+  renderGym();
 }
 
 /** Salta a un día desde un heatmap y lleva la vista a la tarjeta de captura. */
@@ -1383,6 +1649,322 @@ sleepHoursInput.addEventListener("change", (e) => {
   setSleepHours(value);
 });
 
+/* ---------- Bitácora de gimnasio ---------- */
+
+const GYM_EXERCISES = [
+  { name: "RDL (peso muerto rumano)" },
+  { name: "Nórdico excéntrico", prevention: true, bodyweight: true },
+  { name: "Hip thrust", prevention: true },
+  { name: "Good morning", prevention: true },
+  { name: "Búlgara", prevention: true },
+  { name: "Copenhagen plank", bodyweight: true },
+  { name: "Abducción de cadera con banda" },
+  { name: "Media sentadilla" },
+  { name: "Arranque" },
+  { name: "Clean" },
+  { name: "Press de banca" },
+  { name: "Otro" },
+];
+
+const PREVENTION_EXERCISES = GYM_EXERCISES.filter((e) => e.prevention).map((e) => e.name);
+const OTHER_OPTION = "Otro";
+
+const gymForm = document.getElementById("gymForm");
+const gymDateInput = document.getElementById("gymDateInput");
+const gymExerciseSelect = document.getElementById("gymExerciseSelect");
+const gymOtherRow = document.getElementById("gymOtherRow");
+const gymExerciseOther = document.getElementById("gymExerciseOther");
+const gymSetsEl = document.getElementById("gymSets");
+const gymNotesInput = document.getElementById("gymNotesInput");
+const gymFormHint = document.getElementById("gymFormHint");
+const gymHistory = document.getElementById("gymHistory");
+const addSetBtn = document.getElementById("addSetBtn");
+const preventionCounter = document.getElementById("preventionCounter");
+
+/** Series del formulario en curso: { reps, weight } con weight posiblemente vacío. */
+let draftSets = [{ reps: "", weight: "" }];
+
+function isPreventionExercise(name) {
+  return PREVENTION_EXERCISES.indexOf(name) !== -1;
+}
+
+function exerciseInfo(name) {
+  return GYM_EXERCISES.find((e) => e.name === name) || {};
+}
+
+(function fillExerciseSelect() {
+  for (const exercise of GYM_EXERCISES) {
+    const option = document.createElement("option");
+    option.value = exercise.name;
+    option.textContent = exercise.prevention ? `[prevención] ${exercise.name}` : exercise.name;
+    gymExerciseSelect.appendChild(option);
+  }
+})();
+
+/**
+ * Tonelaje de una sesión: suma de reps x peso de cada serie. Si el peso no
+ * aplica (nórdico, Copenhagen) la serie aporta 0 y el cálculo no se rompe.
+ */
+function sessionTonnage(session) {
+  return (session.sets || []).reduce((total, set) => {
+    const reps = Number(set.reps);
+    const weight = set.weight === "" || set.weight == null ? 0 : Number(set.weight);
+    if (!isFinite(reps) || !isFinite(weight)) return total;
+    return total + reps * weight;
+  }, 0);
+}
+
+function formatSet(set) {
+  const hasWeight = set.weight !== "" && set.weight != null;
+  return hasWeight ? `${set.reps} × ${set.weight} kg` : `${set.reps} reps`;
+}
+
+function renderDraftSets() {
+  gymSetsEl.innerHTML = "";
+  const info = exerciseInfo(gymExerciseSelect.value);
+
+  draftSets.forEach((set, index) => {
+    const row = document.createElement("div");
+    row.className = "set-row";
+
+    const label = document.createElement("span");
+    label.className = "set-index";
+    label.textContent = `${index + 1}.`;
+    row.appendChild(label);
+
+    const repsField = document.createElement("div");
+    repsField.className = "field";
+    const repsLabel = document.createElement("label");
+    repsLabel.className = "field-label";
+    repsLabel.textContent = "Reps";
+    const repsInput = document.createElement("input");
+    repsInput.type = "number";
+    repsInput.min = "0";
+    repsInput.step = "1";
+    repsInput.value = set.reps;
+    repsInput.addEventListener("input", (e) => {
+      draftSets[index].reps = e.target.value;
+    });
+    repsField.appendChild(repsLabel);
+    repsField.appendChild(repsInput);
+    row.appendChild(repsField);
+
+    const weightField = document.createElement("div");
+    weightField.className = "field";
+    const weightLabel = document.createElement("label");
+    weightLabel.className = "field-label";
+    weightLabel.textContent = info.bodyweight ? "Peso (no aplica)" : "Peso (kg)";
+    const weightInput = document.createElement("input");
+    weightInput.type = "number";
+    weightInput.min = "0";
+    weightInput.step = "0.5";
+    weightInput.placeholder = info.bodyweight ? "—" : "opcional";
+    weightInput.value = set.weight;
+    weightInput.addEventListener("input", (e) => {
+      draftSets[index].weight = e.target.value;
+    });
+    weightField.appendChild(weightLabel);
+    weightField.appendChild(weightInput);
+    row.appendChild(weightField);
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "set-remove";
+    remove.title = "Quitar serie";
+    remove.textContent = "✕";
+    remove.disabled = draftSets.length === 1;
+    remove.addEventListener("click", () => {
+      draftSets.splice(index, 1);
+      renderDraftSets();
+    });
+    row.appendChild(remove);
+
+    gymSetsEl.appendChild(row);
+  });
+}
+
+function resolvedExerciseName() {
+  if (gymExerciseSelect.value !== OTHER_OPTION) return gymExerciseSelect.value;
+  return gymExerciseOther.value.trim();
+}
+
+function addGymSession() {
+  const name = resolvedExerciseName();
+  if (!name) {
+    gymFormHint.textContent = "Escribe el nombre del ejercicio.";
+    return;
+  }
+  const sets = draftSets
+    .filter((set) => set.reps !== "" && Number(set.reps) > 0)
+    .map((set) => ({
+      reps: Number(set.reps),
+      weight: set.weight === "" ? null : Number(set.weight),
+    }));
+  if (!sets.length) {
+    gymFormHint.textContent = "Registra al menos una serie con repeticiones.";
+    return;
+  }
+
+  state.gym.push({
+    id: uid(),
+    date: gymDateInput.value || activeDate,
+    exercise: name,
+    sets,
+    notes: gymNotesInput.value.trim(),
+  });
+  saveState();
+
+  draftSets = [{ reps: "", weight: "" }];
+  gymNotesInput.value = "";
+  gymExerciseOther.value = "";
+  gymFormHint.textContent = "Sesión guardada.";
+  renderDraftSets();
+  renderGym();
+}
+
+/** Sparkline SVG del tonelaje, dibujada a mano y sin librerías. */
+function buildSparkline(values) {
+  const svgNS = "http://www.w3.org/2000/svg";
+  const width = 200;
+  const height = 40;
+  const pad = 3;
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("class", "sparkline");
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", "Tonelaje a lo largo del tiempo");
+
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const span = max - min || 1;
+  const step = values.length > 1 ? (width - pad * 2) / (values.length - 1) : 0;
+
+  const points = values.map((value, i) => {
+    const x = pad + step * i;
+    const y = height - pad - ((value - min) / span) * (height - pad * 2);
+    return [x, y];
+  });
+
+  const path = document.createElementNS(svgNS, "path");
+  path.setAttribute("class", "sparkline-line");
+  path.setAttribute("vector-effect", "non-scaling-stroke");
+  path.setAttribute("d", points.map((p, i) => `${i === 0 ? "M" : "L"} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" "));
+  svg.appendChild(path);
+
+  const last = points[points.length - 1];
+  const dot = document.createElementNS(svgNS, "circle");
+  dot.setAttribute("class", "sparkline-dot");
+  dot.setAttribute("cx", last[0].toFixed(1));
+  dot.setAttribute("cy", last[1].toFixed(1));
+  dot.setAttribute("r", "2.5");
+  svg.appendChild(dot);
+
+  return svg;
+}
+
+function renderPreventionCounter() {
+  const from = shiftKey(activeDate, -6);
+  const done = new Set(
+    state.gym
+      .filter((s) => s.date >= from && s.date <= activeDate && isPreventionExercise(s.exercise))
+      .map((s) => s.exercise)
+  );
+  preventionCounter.textContent = `Prevención esta semana: ${done.size}/${PREVENTION_EXERCISES.length}`;
+  preventionCounter.classList.toggle("incomplete", done.size < PREVENTION_EXERCISES.length);
+}
+
+function renderGymHistory() {
+  gymHistory.innerHTML = "";
+  if (!state.gym.length) {
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = "Todavía no hay sesiones registradas.";
+    gymHistory.appendChild(empty);
+    return;
+  }
+
+  const byExercise = new Map();
+  for (const session of state.gym) {
+    if (!byExercise.has(session.exercise)) byExercise.set(session.exercise, []);
+    byExercise.get(session.exercise).push(session);
+  }
+
+  const names = [...byExercise.keys()].sort((a, b) => {
+    const ia = GYM_EXERCISES.findIndex((e) => e.name === a);
+    const ib = GYM_EXERCISES.findIndex((e) => e.name === b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
+  });
+
+  for (const name of names) {
+    const sessions = byExercise.get(name).slice().sort((a, b) => a.date.localeCompare(b.date));
+    const details = document.createElement("details");
+    details.className = "accordion";
+
+    const summary = document.createElement("summary");
+    if (isPreventionExercise(name)) {
+      const tag = document.createElement("span");
+      tag.className = "prevention-tag";
+      tag.textContent = "PREVENCIÓN";
+      summary.appendChild(tag);
+    }
+    summary.appendChild(document.createTextNode(name));
+    const count = document.createElement("span");
+    count.className = "accordion-count";
+    count.textContent = `${sessions.length} ${sessions.length === 1 ? "sesión" : "sesiones"}`;
+    summary.appendChild(count);
+    details.appendChild(summary);
+
+    const body = document.createElement("div");
+    body.className = "accordion-body";
+
+    const last = sessions[sessions.length - 1];
+    const meta = document.createElement("div");
+    meta.className = "session-meta";
+    meta.textContent = `Última sesión · ${last.date}${last.notes ? ` · ${last.notes}` : ""}`;
+    body.appendChild(meta);
+
+    const setsEl = document.createElement("div");
+    setsEl.className = "session-sets";
+    setsEl.textContent = last.sets.map(formatSet).join("  ·  ");
+    body.appendChild(setsEl);
+
+    const tonnages = sessions.map(sessionTonnage);
+    const best = Math.max(...tonnages);
+    const bestEl = document.createElement("div");
+    bestEl.className = "best-tonnage";
+    bestEl.textContent =
+      best > 0 ? `Mejor tonelaje de una sesión: ${best.toLocaleString("es")} kg` : "Sin peso registrado (ejercicio de peso corporal)";
+    body.appendChild(bestEl);
+
+    if (best > 0) body.appendChild(buildSparkline(tonnages));
+
+    details.appendChild(body);
+    gymHistory.appendChild(details);
+  }
+}
+
+function renderGym() {
+  renderPreventionCounter();
+  renderGymHistory();
+}
+
+gymExerciseSelect.addEventListener("change", () => {
+  gymOtherRow.hidden = gymExerciseSelect.value !== OTHER_OPTION;
+  gymFormHint.textContent = "";
+  renderDraftSets();
+});
+
+addSetBtn.addEventListener("click", () => {
+  draftSets.push({ reps: "", weight: "" });
+  renderDraftSets();
+});
+
+gymForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  addGymSession();
+});
+
 function renderStats() {
   const total = state.habits.length;
   const doneOnActive = state.habits.filter((h) => h.dates[activeDate]).length;
@@ -1429,6 +2011,9 @@ renderDateBar();
 render();
 renderRecovery();
 renderSleep();
+gymDateInput.value = activeDate;
+renderDraftSets();
+renderGym();
 </script>
 </body>
 </html>
