@@ -536,6 +536,94 @@ h1 {
   font-size: 0.88rem;
 }
 
+/* ---------- Marcas ---------- */
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.summary-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 12px;
+  text-align: center;
+}
+
+.summary-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1.2;
+}
+
+.summary-value.none { color: var(--text-dim); font-size: 1.1rem; }
+
+.summary-label {
+  font-size: 0.76rem;
+  color: var(--text-dim);
+}
+
+.summary-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+table.data th,
+table.data td {
+  text-align: left;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+table.data th {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  font-weight: 700;
+}
+
+table.data td.num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+table.data tr:last-child td { border-bottom: none; }
+
+.pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.pill.vallas {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .sleep-top {
   display: flex;
   align-items: center;
@@ -968,6 +1056,70 @@ h1 {
 
       <div id="gymHistory" style="margin-top: 24px;"></div>
     </section>
+
+    <section class="card" id="marksCard">
+      <h2 class="card-title">⏱️ Marcas</h2>
+
+      <div class="summary-cards">
+        <div class="summary-card">
+          <span class="summary-value none" id="best400h">—</span>
+          <span class="summary-label">Mejor 400 con vallas</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-value none" id="best400f">—</span>
+          <span class="summary-label">Mejor 400 plano</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-value none" id="diff400">—</span>
+          <span class="summary-label">Diferencial</span>
+          <span class="summary-hint">Objetivo: bajar de 3.5 s</span>
+        </div>
+      </div>
+
+      <form id="markForm">
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="markDateInput">Fecha</label>
+            <input type="date" id="markDateInput" required>
+          </div>
+          <div class="field">
+            <label class="field-label" for="markDistanceSelect">Distancia</label>
+            <select id="markDistanceSelect"></select>
+          </div>
+          <div class="field">
+            <label class="field-label" for="markTypeSelect">Tipo</label>
+            <select id="markTypeSelect">
+              <option value="plano">plano</option>
+              <option value="vallas">vallas</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="markTimeInput">Tiempo (s)</label>
+            <input type="number" id="markTimeInput" min="0" step="0.01" placeholder="ej. 51.60" required>
+          </div>
+          <div class="field" id="markStepsField" hidden>
+            <label class="field-label" for="markStepsInput">Pasos entre vallas</label>
+            <input type="number" id="markStepsInput" min="0" step="1" placeholder="ej. 15">
+          </div>
+          <div class="field">
+            <label class="field-label" for="markNotesInput">Notas (opcional)</label>
+            <input type="text" id="markNotesInput" maxlength="120" placeholder="ej. viento en contra">
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Guardar marca</button>
+          <span class="muted" id="markFormHint"></span>
+        </div>
+      </form>
+
+      <div class="table-wrap" style="margin-top: 24px;">
+        <table class="data" id="marksTable"></table>
+      </div>
+    </section>
   </div>
 
   <template id="habitTemplate">
@@ -1199,6 +1351,8 @@ function setActiveDate(key) {
   renderSleep();
   gymDateInput.value = activeDate;
   renderGym();
+  markDateInput.value = activeDate;
+  renderMarks();
 }
 
 /** Salta a un día desde un heatmap y lleva la vista a la tarjeta de captura. */
@@ -1965,6 +2119,168 @@ gymForm.addEventListener("submit", (e) => {
   addGymSession();
 });
 
+/* ---------- Marcas ---------- */
+
+const MARK_DISTANCES = [60, 100, 150, 200, 300, 400];
+const DIFF_TARGET = 3.5;
+
+const markForm = document.getElementById("markForm");
+const markDateInput = document.getElementById("markDateInput");
+const markDistanceSelect = document.getElementById("markDistanceSelect");
+const markTypeSelect = document.getElementById("markTypeSelect");
+const markTimeInput = document.getElementById("markTimeInput");
+const markStepsField = document.getElementById("markStepsField");
+const markStepsInput = document.getElementById("markStepsInput");
+const markNotesInput = document.getElementById("markNotesInput");
+const markFormHint = document.getElementById("markFormHint");
+const marksTable = document.getElementById("marksTable");
+
+(function fillDistanceSelect() {
+  for (const distance of MARK_DISTANCES) {
+    const option = document.createElement("option");
+    option.value = String(distance);
+    option.textContent = `${distance} m`;
+    markDistanceSelect.appendChild(option);
+  }
+  markDistanceSelect.value = "400";
+})();
+
+function formatSeconds(value) {
+  return value == null ? "—" : value.toFixed(2);
+}
+
+/** Mejor (menor) tiempo registrado para una distancia y tipo, o null. */
+function bestMark(distance, type) {
+  const times = state.marks
+    .filter((m) => Number(m.distance) === distance && m.type === type)
+    .map((m) => Number(m.time))
+    .filter((t) => isFinite(t) && t > 0);
+  return times.length ? Math.min(...times) : null;
+}
+
+function addMark() {
+  const time = Number(markTimeInput.value);
+  if (!isFinite(time) || time <= 0) {
+    markFormHint.textContent = "Escribe un tiempo válido.";
+    return;
+  }
+  const type = markTypeSelect.value;
+  const steps = type === "vallas" && markStepsInput.value !== "" ? Number(markStepsInput.value) : null;
+
+  state.marks.push({
+    id: uid(),
+    date: markDateInput.value || activeDate,
+    distance: Number(markDistanceSelect.value),
+    type,
+    time,
+    steps,
+    notes: markNotesInput.value.trim(),
+  });
+  saveState();
+
+  markTimeInput.value = "";
+  markStepsInput.value = "";
+  markNotesInput.value = "";
+  markFormHint.textContent = "Marca guardada.";
+  renderMarks();
+}
+
+function renderMarkSummary() {
+  const hurdles = bestMark(400, "vallas");
+  const flat = bestMark(400, "plano");
+  const diff = hurdles != null && flat != null ? hurdles - flat : null;
+
+  const set = (id, value, suffix) => {
+    const el = document.getElementById(id);
+    el.textContent = value == null ? "—" : `${formatSeconds(value)}${suffix || ""}`;
+    el.classList.toggle("none", value == null);
+  };
+
+  set("best400h", hurdles);
+  set("best400f", flat);
+  set("diff400", diff, " s");
+}
+
+function renderMarksTable() {
+  marksTable.innerHTML = "";
+  const rows = state.marks.slice().sort((a, b) => b.date.localeCompare(a.date));
+
+  if (!rows.length) {
+    const caption = document.createElement("caption");
+    caption.className = "muted";
+    caption.style.captionSide = "bottom";
+    caption.style.textAlign = "left";
+    caption.style.paddingTop = "10px";
+    caption.textContent = "Todavía no hay marcas registradas.";
+    marksTable.appendChild(caption);
+    return;
+  }
+
+  const head = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  for (const label of ["Fecha", "Distancia", "Tipo", "Tiempo", "Pasos", "Notas"]) {
+    const th = document.createElement("th");
+    th.textContent = label;
+    headRow.appendChild(th);
+  }
+  head.appendChild(headRow);
+  marksTable.appendChild(head);
+
+  const body = document.createElement("tbody");
+  for (const mark of rows) {
+    const tr = document.createElement("tr");
+
+    const date = document.createElement("td");
+    date.textContent = mark.date;
+    tr.appendChild(date);
+
+    const distance = document.createElement("td");
+    distance.textContent = `${mark.distance} m`;
+    tr.appendChild(distance);
+
+    const type = document.createElement("td");
+    const pill = document.createElement("span");
+    pill.className = `pill${mark.type === "vallas" ? " vallas" : ""}`;
+    pill.textContent = mark.type;
+    type.appendChild(pill);
+    tr.appendChild(type);
+
+    const time = document.createElement("td");
+    time.className = "num";
+    time.textContent = formatSeconds(Number(mark.time));
+    tr.appendChild(time);
+
+    const steps = document.createElement("td");
+    steps.className = "num";
+    steps.textContent = mark.steps != null ? String(mark.steps) : "—";
+    tr.appendChild(steps);
+
+    const notes = document.createElement("td");
+    notes.style.whiteSpace = "normal";
+    notes.textContent = mark.notes || "";
+    tr.appendChild(notes);
+
+    body.appendChild(tr);
+  }
+  marksTable.appendChild(body);
+}
+
+function renderMarks() {
+  renderMarkSummary();
+  renderMarksTable();
+}
+
+/** Los pasos entre vallas sólo tienen sentido en una carrera con vallas. */
+markTypeSelect.addEventListener("change", () => {
+  markStepsField.hidden = markTypeSelect.value !== "vallas";
+  if (markStepsField.hidden) markStepsInput.value = "";
+});
+
+markForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  addMark();
+});
+
 function renderStats() {
   const total = state.habits.length;
   const doneOnActive = state.habits.filter((h) => h.dates[activeDate]).length;
@@ -2014,6 +2330,8 @@ renderSleep();
 gymDateInput.value = activeDate;
 renderDraftSets();
 renderGym();
+markDateInput.value = activeDate;
+renderMarks();
 </script>
 </body>
 </html>
