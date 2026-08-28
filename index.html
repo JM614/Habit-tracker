@@ -153,6 +153,27 @@ h1 {
   gap: 10px;
 }
 
+.drag-handle {
+  cursor: grab;
+  color: var(--text-dim);
+  font-size: 1rem;
+  padding: 4px;
+  flex-shrink: 0;
+  touch-action: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.habit-card.dragging {
+  opacity: 0.5;
+}
+
+.habit-card.drag-over {
+  border-color: var(--accent);
+}
+
 .check-btn {
   width: 30px;
   height: 30px;
@@ -273,6 +294,7 @@ h1 {
   <template id="habitTemplate">
     <li class="habit-card">
       <div class="habit-row">
+        <span class="drag-handle" title="Arrastrar para reordenar">⠿</span>
         <button class="check-btn" title="Marcar hoy"></button>
         <span class="habit-name"></span>
         <span class="habit-streak"></span>
@@ -334,6 +356,16 @@ function addHabit(name) {
 
 function deleteHabit(id) {
   state.habits = state.habits.filter((h) => h.id !== id);
+  saveState();
+  render();
+}
+
+function reorderHabits(draggedId, targetId) {
+  const fromIndex = state.habits.findIndex((h) => h.id === draggedId);
+  const toIndex = state.habits.findIndex((h) => h.id === targetId);
+  if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return;
+  const [moved] = state.habits.splice(fromIndex, 1);
+  state.habits.splice(toIndex, 0, moved);
   saveState();
   render();
 }
@@ -416,6 +448,8 @@ function render() {
 
   for (const habit of state.habits) {
     const node = template.content.cloneNode(true);
+    const card = node.querySelector(".habit-card");
+    const dragHandle = node.querySelector(".drag-handle");
     const checkBtn = node.querySelector(".check-btn");
     const nameEl = node.querySelector(".habit-name");
     const streakEl = node.querySelector(".habit-streak");
@@ -432,6 +466,36 @@ function render() {
 
     deleteBtn.addEventListener("click", () => {
       if (confirm(`¿Eliminar "${habit.name}"?`)) deleteHabit(habit.id);
+    });
+
+    card.draggable = false;
+    dragHandle.addEventListener("mousedown", () => {
+      card.draggable = true;
+    });
+    card.addEventListener("dragstart", (e) => {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", habit.id);
+      card.classList.add("dragging");
+    });
+    card.addEventListener("dragend", () => {
+      card.draggable = false;
+      card.classList.remove("dragging");
+    });
+    card.addEventListener("dragenter", (e) => {
+      e.preventDefault();
+      card.classList.add("drag-over");
+    });
+    card.addEventListener("dragleave", () => {
+      card.classList.remove("drag-over");
+    });
+    card.addEventListener("dragover", (e) => {
+      e.preventDefault();
+    });
+    card.addEventListener("drop", (e) => {
+      e.preventDefault();
+      card.classList.remove("drag-over");
+      const draggedId = e.dataTransfer.getData("text/plain");
+      reorderHabits(draggedId, habit.id);
     });
 
     renderHeatmap(heatmap, habit);
