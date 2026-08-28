@@ -176,6 +176,48 @@ h1 {
   color: var(--sleep-mid);
 }
 
+/* ---------- Pestañas ---------- */
+
+.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  margin-bottom: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+}
+
+.tab {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 6px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tab:hover { color: var(--text); }
+
+.tab.active {
+  background: var(--accent);
+  color: white;
+}
+
+@media (max-width: 400px) {
+  .tab { font-size: 0.72rem; padding: 11px 4px; }
+}
+
 .stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1094,23 +1136,16 @@ td.delta-better { color: var(--accent); }
       <span class="date-warning" id="dateWarning" hidden></span>
     </section>
 
-    <section class="stats" id="stats">
-      <div class="stat-card">
-        <span class="stat-value" id="statToday">0%</span>
-        <span class="stat-label" id="statTodayLabel">Hoy</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value" id="statHabits">0</span>
-        <span class="stat-label">Hábitos</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-value" id="statBestStreak">0</span>
-        <span class="stat-label">Mejor racha</span>
-      </div>
-    </section>
-
     <div id="recoveryBanners"></div>
 
+    <nav class="tabs" id="tabs" aria-label="Secciones">
+      <button type="button" class="tab" data-tab="hoy">Hoy</button>
+      <button type="button" class="tab" data-tab="entrenamiento">Entrenamiento</button>
+      <button type="button" class="tab" data-tab="marcas">Marcas</button>
+      <button type="button" class="tab" data-tab="resumen">Resumen</button>
+    </nav>
+
+    <div class="tab-panel" data-panel="hoy">
     <section class="card" id="recoveryCard">
       <h2 class="card-title">🦵 Molestia de isquiotibiales</h2>
       <div class="recovery-legs">
@@ -1176,7 +1211,9 @@ td.delta-better { color: var(--accent); }
     <ul id="habitList" class="habit-list"></ul>
 
     <p id="emptyState" class="empty-state">Aún no tienes hábitos. ¡Añade el primero arriba! 👆</p>
+    </div>
 
+    <div class="tab-panel" data-panel="entrenamiento" hidden>
     <section class="card" id="gymCard">
       <h2 class="card-title">🏋️ Bitácora de gimnasio</h2>
       <div class="prevention-counter" id="preventionCounter">Prevención esta semana: 0/4</div>
@@ -1218,7 +1255,9 @@ td.delta-better { color: var(--accent); }
 
       <div id="gymHistory" style="margin-top: 24px;"></div>
     </section>
+    </div>
 
+    <div class="tab-panel" data-panel="marcas" hidden>
     <section class="card" id="marksCard">
       <h2 class="card-title">⏱️ Marcas</h2>
 
@@ -1332,13 +1371,31 @@ td.delta-better { color: var(--accent); }
         </div>
       </div>
     </section>
+    </div>
 
+    <div class="tab-panel" data-panel="resumen" hidden>
     <section class="card" id="summaryCard">
       <h2 class="card-title">📋 Resumen de los últimos 7 días</h2>
       <p class="muted" id="summaryRange" style="margin: -8px 0 16px;"></p>
       <div class="summary-cards" id="summaryGrid"></div>
       <div class="banner orange" id="sleepWarning" hidden></div>
     </section>
+
+    <section class="stats" id="stats">
+      <div class="stat-card">
+        <span class="stat-value" id="statToday">0%</span>
+        <span class="stat-label" id="statTodayLabel">Hoy</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value" id="statHabits">0</span>
+        <span class="stat-label">Hábitos</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-value" id="statBestStreak">0</span>
+        <span class="stat-label">Mejor racha</span>
+      </div>
+    </section>
+    </div>
   </div>
 
   <template id="habitTemplate">
@@ -3234,6 +3291,28 @@ importCancelBtn.addEventListener("click", () => {
   closeImportConfirm();
   showNotice("Importación cancelada. No se cambió nada.", null);
 });
+
+/* ---------- Navegación por pestañas ---------- */
+
+const TAB_KEY = "habit-tracker-tab";
+const DEFAULT_TAB = "hoy";
+
+const tabButtons = [...document.querySelectorAll(".tab")];
+const tabPanels = [...document.querySelectorAll(".tab-panel")];
+const TAB_NAMES = tabButtons.map((btn) => btn.dataset.tab);
+
+function setTab(name) {
+  const target = TAB_NAMES.indexOf(name) === -1 ? DEFAULT_TAB : name;
+  for (const btn of tabButtons) btn.classList.toggle("active", btn.dataset.tab === target);
+  for (const panel of tabPanels) panel.hidden = panel.dataset.panel !== target;
+  writeRaw(TAB_KEY, target);
+}
+
+for (const btn of tabButtons) {
+  btn.addEventListener("click", () => setTab(btn.dataset.tab));
+}
+
+setTab(readRaw(TAB_KEY) || DEFAULT_TAB);
 
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
