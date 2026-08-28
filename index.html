@@ -20,6 +20,8 @@
   --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
   --radius: 14px;
   --cell: 11px;
+  --month-row: 13px;
+  --month-gap: 9px;
 }
 
 [data-theme="dark"] {
@@ -1040,12 +1042,13 @@ table.data tr:last-child td { border-bottom: none; }
   min-width: 0;
 }
 
+/* La primera fila es la de etiquetas de mes; el eje lleva un hueco del mismo
+   alto para que las siete letras sigan alineadas con sus filas de celdas. */
 .heatmap-axis {
   display: grid;
-  grid-template-rows: repeat(7, var(--cell));
+  grid-template-rows: var(--month-row) repeat(7, var(--cell));
   gap: 3px;
   flex-shrink: 0;
-  padding-top: 0;
 }
 
 .heatmap-axis span {
@@ -1058,12 +1061,21 @@ table.data tr:last-child td { border-bottom: none; }
 
 .heatmap {
   display: grid;
-  grid-template-rows: repeat(7, var(--cell));
-  grid-auto-flow: column;
+  grid-template-rows: var(--month-row) repeat(7, var(--cell));
   gap: 3px;
   overflow-x: auto;
   padding-bottom: 4px;
   min-width: 0;
+}
+
+.heatmap-month-label {
+  grid-row: 1;
+  font-size: 0.6rem;
+  line-height: var(--month-row);
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-align: left;
 }
 
 .heat-cell {
@@ -1076,7 +1088,7 @@ table.data tr:last-child td { border-bottom: none; }
 
 /* Si el gesto principal es tocar una celda, 11 px es muy chico para el dedo. */
 @media (max-width: 640px) {
-  :root { --cell: 15px; }
+  :root { --cell: 15px; --month-gap: 11px; }
   .heat-cell { border-radius: 3px; }
   .heatmap-axis span { font-size: 0.62rem; }
 }
@@ -1843,6 +1855,8 @@ function ensureHeatmapAxis(container) {
   const axis = document.createElement("div");
   axis.className = "heatmap-axis";
   axis.setAttribute("aria-hidden", "true");
+  // Hueco que corresponde a la fila de etiquetas de mes del heatmap.
+  axis.appendChild(document.createElement("span"));
   for (const label of WEEKDAY_LABELS) {
     const span = document.createElement("span");
     span.textContent = label;
@@ -1855,13 +1869,82 @@ function ensureHeatmapAxis(container) {
   return wrap;
 }
 
+const MONTH_LABELS = [
+  "ene", "feb", "mar", "abr", "may", "jun",
+  "jul", "ago", "sep", "oct", "nov", "dic",
+];
+
+/**
+ * Pinta un heatmap agrupado por mes: cada columna es una semana y pertenece al
+ * mes de su lunes. Entre un mes y el siguiente queda un hueco visible, y cada
+ * grupo lleva su etiqueta encima. Con 26 semanas a la vista, sin esto la
+ * cuadrícula es una tira de días sin ninguna referencia de dónde acaba un mes.
+ *
+ * `makeCell(key, date)` devuelve la celda ya configurada. Devuelve un Map de
+ * fecha -> celda para poder actualizarlas de a una.
+ */
+function paintHeatmap(container, makeCell) {
+  container.innerHTML = "";
+  const days = buildHeatmapDays();
+
+  const weeks = [];
+  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+
+  const groups = [];
+  for (const week of weeks) {
+    const monday = week[0];
+    const last = groups[groups.length - 1];
+    if (last && last.month === monday.getMonth() && last.year === monday.getFullYear()) {
+      last.weeks.push(week);
+    } else {
+      groups.push({ month: monday.getMonth(), year: monday.getFullYear(), weeks: [week] });
+    }
+  }
+
+  // Pista de columnas: las semanas de cada mes, con un hueco entre meses.
+  const tracks = [];
+  const startColumns = [];
+  for (const group of groups) {
+    if (tracks.length) tracks.push("var(--month-gap)");
+    startColumns.push(tracks.length + 1);
+    for (let i = 0; i < group.weeks.length; i++) tracks.push("var(--cell)");
+  }
+  container.style.gridTemplateColumns = tracks.join(" ");
+
+  const cells = new Map();
+  groups.forEach((group, index) => {
+    const startColumn = startColumns[index];
+    const previous = groups[index - 1];
+
+    const label = document.createElement("span");
+    label.className = "heatmap-month-label";
+    // El año sólo cuando cambia: la temporada llega a febrero y "ene" a secas
+    // sería ambiguo junto a diciembre.
+    const showYear = !previous || previous.year !== group.year;
+    label.textContent =
+      MONTH_LABELS[group.month] + (showYear ? ` ${String(group.year).slice(2)}` : "");
+    label.style.gridColumn = `${startColumn} / span ${group.weeks.length}`;
+    container.appendChild(label);
+
+    group.weeks.forEach((week, weekIndex) => {
+      week.forEach((date, weekday) => {
+        const key = dateKey(date);
+        const cell = makeCell(key, date);
+        cell.style.gridColumn = String(startColumn + weekIndex);
+        cell.style.gridRow = String(weekday + 2);
+        container.appendChild(cell);
+        cells.set(key, cell);
+      });
+    });
+  });
+
+  return cells;
+}
+
 /** Devuelve un Map de fecha -> celda, para poder actualizarlas de a una. */
 function renderHeatmap(container, habit) {
   ensureHeatmapAxis(container);
-  container.innerHTML = "";
-  const cells = new Map();
-  for (const d of buildHeatmapDays()) {
-    const key = dateKey(d);
+  return paintHeatmap(container, (key) => {
     const cell = document.createElement("div");
     cell.className =
       "heat-cell" + (habit.dates[key] ? " on" : "") + (key === activeDate ? " today" : "");
@@ -1871,10 +1954,8 @@ function renderHeatmap(container, habit) {
       toggleDate(habit, key);
       if (key !== activeDate) setActiveDate(key);
     });
-    container.appendChild(cell);
-    cells.set(key, cell);
-  }
-  return cells;
+    return cell;
+  });
 }
 
 function updateStreakLabel(el, habit) {
@@ -2066,19 +2147,17 @@ function renderLeg(leg) {
 
 function renderPainHeatmap(container, field) {
   ensureHeatmapAxis(container);
-  container.innerHTML = "";
   const card = document.getElementById("recoveryCard");
-  for (const d of buildHeatmapDays()) {
-    const key = dateKey(d);
+  paintHeatmap(container, (key) => {
     const value = getPain(key, field);
-    const cell = document.createElement("div");
     const level = value == null ? null : painLevel(value);
+    const cell = document.createElement("div");
     cell.className =
       "heat-cell" + (level ? ` ${level.cls}` : "") + (key === activeDate ? " today" : "");
     cell.title = value == null ? `${key}: sin registrar` : `${key}: ${value}/10 · ${level.label}`;
     cell.addEventListener("click", () => focusDate(key, card));
-    container.appendChild(cell);
-  }
+    return cell;
+  });
 }
 
 /** Un día cuenta como registrado si al menos una pierna tiene valor. */
@@ -2254,11 +2333,8 @@ function renderSleep() {
 
 function renderSleepHeatmap() {
   ensureHeatmapAxis(sleepHeatmap);
-  sleepHeatmap.innerHTML = "";
-  const days = buildHeatmapDays();
   const card = document.getElementById("sleepCard");
-  for (const d of days) {
-    const key = dateKey(d);
+  paintHeatmap(sleepHeatmap, (key) => {
     const entry = state.sleep[key];
     const category = sleepCategory(computeSleepScore(entry));
     const info = SLEEP_CATEGORY_INFO[category];
@@ -2269,8 +2345,8 @@ function renderSleepHeatmap() {
       (key === activeDate ? " today" : "");
     cell.title = `${key}: ${info.emoji} ${info.label}`;
     cell.addEventListener("click", () => focusDate(key, card));
-    sleepHeatmap.appendChild(cell);
-  }
+    return cell;
+  });
 }
 
 // Mismo problema que los sliders de isquio: éste arranca en 5, así que tocar
