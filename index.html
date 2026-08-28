@@ -54,12 +54,19 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+  gap: 12px;
 }
 
 h1 {
   font-size: 1.6rem;
   margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .icon-btn {
@@ -71,6 +78,85 @@ h1 {
   font-size: 1.1rem;
   cursor: pointer;
   box-shadow: var(--shadow);
+  color: var(--text);
+}
+
+.notice {
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.notice.warn {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.notice.ok {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.date-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+
+.date-bar .icon-btn {
+  width: 44px;
+  height: 44px;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.date-input {
+  flex: 1;
+  min-width: 140px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.date-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.btn-ghost {
+  padding: 11px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-ghost:hover { border-color: var(--accent); }
+
+.date-warning {
+  flex-basis: 100%;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--sleep-mid);
 }
 
 .stats {
@@ -403,13 +489,25 @@ h1 {
   <div class="app">
     <header>
       <h1>Mis Hábitos</h1>
-      <button id="themeToggle" class="icon-btn" title="Cambiar tema">🌙</button>
+      <div class="header-actions">
+        <button id="themeToggle" class="icon-btn" title="Cambiar tema">🌙</button>
+      </div>
     </header>
+
+    <div id="notice" class="notice" hidden></div>
+
+    <section class="date-bar">
+      <button class="icon-btn" id="prevDayBtn" title="Día anterior" aria-label="Día anterior">‹</button>
+      <input type="date" id="activeDateInput" class="date-input" aria-label="Fecha activa">
+      <button class="icon-btn" id="nextDayBtn" title="Día siguiente" aria-label="Día siguiente">›</button>
+      <button class="btn-ghost" id="todayBtn">Hoy</button>
+      <span class="date-warning" id="dateWarning" hidden></span>
+    </section>
 
     <section class="stats" id="stats">
       <div class="stat-card">
         <span class="stat-value" id="statToday">0%</span>
-        <span class="stat-label">Hoy</span>
+        <span class="stat-label" id="statTodayLabel">Hoy</span>
       </div>
       <div class="stat-card">
         <span class="stat-value" id="statHabits">0</span>
@@ -474,9 +572,19 @@ h1 {
   </template>
 
 <script>
-const STORAGE_KEY = "habit-tracker-data-v1";
+const STORAGE_KEY_V1 = "habit-tracker-data-v1";
+const STORAGE_KEY = "habit-tracker-data-v2";
+const BACKUP_PREFIX = "habit-tracker-backup-";
+const SCHEMA_VERSION = 2;
 const THEME_KEY = "habit-tracker-theme";
 const WEEKS_VISIBLE = 12;
+
+const noticeEl = document.getElementById("notice");
+const activeDateInput = document.getElementById("activeDateInput");
+const prevDayBtn = document.getElementById("prevDayBtn");
+const nextDayBtn = document.getElementById("nextDayBtn");
+const todayBtn = document.getElementById("todayBtn");
+const dateWarning = document.getElementById("dateWarning");
 
 const state = loadState();
 
@@ -501,22 +609,134 @@ const SLEEP_CATEGORY_INFO = {
   none: { emoji: "🌙", label: "Sin datos" },
 };
 
-function loadState() {
+function uid() {
+  return crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
+}
+
+function readRaw(key) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (!parsed.sleep) parsed.sleep = {};
-      return parsed;
+    return localStorage.getItem(key);
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeRaw(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function showNotice(message, kind) {
+  if (!noticeEl) return;
+  noticeEl.textContent = message;
+  noticeEl.className = "notice" + (kind ? " " + kind : "");
+  noticeEl.hidden = false;
+}
+
+/** Estado v2 vacío, con todas las colecciones presentes. */
+function createEmptyState() {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    habits: [],
+    sleep: {},
+    recovery: {},
+    gym: [],
+    marks: [],
+    races: [],
+  };
+}
+
+function isPlainObject(value) {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Devuelve siempre un estado v2 completo: si falta una colección la inicializa
+ * vacía en vez de dejar que el render truene más adelante.
+ */
+function normalizeState(input) {
+  const out = createEmptyState();
+  if (!isPlainObject(input)) return out;
+
+  if (Array.isArray(input.habits)) {
+    out.habits = input.habits.filter(isPlainObject).map((h) => ({
+      id: h.id != null ? String(h.id) : uid(),
+      name: typeof h.name === "string" && h.name.trim() ? h.name : "Hábito sin nombre",
+      dates: isPlainObject(h.dates) ? h.dates : {},
+      createdAt: typeof h.createdAt === "string" ? h.createdAt : todayKey(),
+    }));
+  }
+  if (isPlainObject(input.sleep)) out.sleep = input.sleep;
+  if (isPlainObject(input.recovery)) out.recovery = input.recovery;
+  if (Array.isArray(input.gym)) out.gym = input.gym.filter(isPlainObject);
+  if (Array.isArray(input.marks)) out.marks = input.marks.filter(isPlainObject);
+  if (Array.isArray(input.races)) out.races = input.races.filter(isPlainObject);
+
+  return out;
+}
+
+/** Guarda el texto ilegible antes de arrancar limpio, para no perderlo en silencio. */
+function backupCorrupt(sourceKey, raw) {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  writeRaw(`${BACKUP_PREFIX}${sourceKey}-${stamp}`, raw);
+}
+
+/**
+ * Migra habit-tracker-data-v1 a v2. La llave v1 NO se borra ni se sobrescribe:
+ * queda como respaldo de los datos ya capturados.
+ */
+function migrateFromV1(rawV1) {
+  const migrated = normalizeState(JSON.parse(rawV1));
+  migrated.schemaVersion = SCHEMA_VERSION;
+  writeRaw(STORAGE_KEY, JSON.stringify(migrated));
+  return migrated;
+}
+
+function loadState() {
+  const rawV2 = readRaw(STORAGE_KEY);
+  if (rawV2 != null) {
+    try {
+      return normalizeState(JSON.parse(rawV2));
+    } catch (e) {
+      backupCorrupt(STORAGE_KEY, rawV2);
+      showNotice(
+        "Los datos guardados estaban dañados y no se pudieron leer. Se guardó una copia del texto original y la página arrancó vacía.",
+        "warn"
+      );
+      return createEmptyState();
     }
-  } catch (e) {}
-  return { habits: [], sleep: {} };
+  }
+
+  const rawV1 = readRaw(STORAGE_KEY_V1);
+  if (rawV1 != null) {
+    try {
+      const migrated = migrateFromV1(rawV1);
+      showNotice(
+        "Datos migrados a la versión 2. La copia anterior sigue guardada como respaldo.",
+        "ok"
+      );
+      return migrated;
+    } catch (e) {
+      backupCorrupt(STORAGE_KEY_V1, rawV1);
+      showNotice(
+        "No se pudo migrar el respaldo anterior porque estaba dañado. Se guardó una copia del texto original y la página arrancó vacía.",
+        "warn"
+      );
+      return createEmptyState();
+    }
+  }
+
+  return createEmptyState();
 }
 
 function saveState() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (e) {}
+  if (!writeRaw(STORAGE_KEY, JSON.stringify(state))) {
+    showNotice("No se pudo guardar en este navegador. Revisa el espacio disponible.", "warn");
+  }
 }
 
 function todayKey() {
@@ -530,9 +750,76 @@ function dateKey(d) {
   return `${y}-${m}-${day}`;
 }
 
+function parseKey(key) {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function shiftKey(key, days) {
+  const d = parseKey(key);
+  d.setDate(d.getDate() + days);
+  return dateKey(d);
+}
+
+/* ---------- Fecha activa ---------- */
+
+let activeDate = todayKey();
+
+function isActiveToday() {
+  return activeDate === todayKey();
+}
+
+function formatLongDate(key) {
+  return parseKey(key).toLocaleDateString("es", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+}
+
+function setActiveDate(key) {
+  const max = todayKey();
+  activeDate = key > max ? max : key;
+  renderDateBar();
+  render();
+  renderSleep();
+}
+
+/** Salta a un día desde un heatmap y lleva la vista a la tarjeta de captura. */
+function focusDate(key, scrollTarget) {
+  setActiveDate(key);
+  if (scrollTarget && scrollTarget.scrollIntoView) {
+    scrollTarget.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+}
+
+function renderDateBar() {
+  activeDateInput.value = activeDate;
+  activeDateInput.max = todayKey();
+  nextDayBtn.disabled = isActiveToday();
+  nextDayBtn.style.opacity = isActiveToday() ? "0.4" : "1";
+  todayBtn.disabled = isActiveToday();
+
+  if (isActiveToday()) {
+    dateWarning.hidden = true;
+    dateWarning.textContent = "";
+  } else {
+    dateWarning.hidden = false;
+    dateWarning.textContent = `⚠️ Estás editando ${formatLongDate(activeDate)}, no hoy.`;
+  }
+}
+
+prevDayBtn.addEventListener("click", () => setActiveDate(shiftKey(activeDate, -1)));
+nextDayBtn.addEventListener("click", () => setActiveDate(shiftKey(activeDate, 1)));
+todayBtn.addEventListener("click", () => setActiveDate(todayKey()));
+activeDateInput.addEventListener("change", (e) => {
+  if (e.target.value) setActiveDate(e.target.value);
+  else renderDateBar();
+});
+
 function addHabit(name) {
   state.habits.push({
-    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+    id: uid(),
     name,
     dates: {},
     createdAt: todayKey(),
@@ -618,13 +905,17 @@ function buildHeatmapDays() {
 function renderHeatmap(container, habit) {
   container.innerHTML = "";
   const days = buildHeatmapDays();
-  const today = todayKey();
   for (const d of days) {
     const key = dateKey(d);
     const cell = document.createElement("div");
-    cell.className = "heat-cell" + (habit.dates[key] ? " on" : "") + (key === today ? " today" : "");
+    cell.className =
+      "heat-cell" + (habit.dates[key] ? " on" : "") + (key === activeDate ? " today" : "");
     cell.title = `${key}${habit.dates[key] ? " ✓" : ""}`;
-    cell.addEventListener("click", () => toggleDate(habit, key));
+    cell.addEventListener("click", () => {
+      // Ver un hueco y llenarlo: marca el día y deja la fecha activa ahí.
+      toggleDate(habit, key);
+      setActiveDate(key);
+    });
     container.appendChild(cell);
   }
 }
@@ -644,9 +935,10 @@ function render() {
     const heatmap = node.querySelector(".heatmap");
 
     nameEl.textContent = habit.name;
-    const doneToday = !!habit.dates[todayKey()];
-    checkBtn.classList.toggle("done", doneToday);
-    checkBtn.addEventListener("click", () => toggleDate(habit, todayKey()));
+    const doneOnActive = !!habit.dates[activeDate];
+    checkBtn.classList.toggle("done", doneOnActive);
+    checkBtn.title = isActiveToday() ? "Marcar hoy" : `Marcar ${activeDate}`;
+    checkBtn.addEventListener("click", () => toggleDate(habit, activeDate));
 
     const streak = computeStreak(habit);
     streakEl.textContent = streak > 0 ? `🔥 ${streak} día${streak === 1 ? "" : "s"}` : "Sin racha";
@@ -692,12 +984,12 @@ function render() {
   renderStats();
 }
 
-function getTodaySleep() {
-  return state.sleep[todayKey()] || {};
+function getActiveSleep() {
+  return state.sleep[activeDate] || {};
 }
 
 function setSleepQuality(value) {
-  const key = todayKey();
+  const key = activeDate;
   if (!state.sleep[key]) state.sleep[key] = {};
   state.sleep[key].quality = value;
   saveState();
@@ -705,7 +997,7 @@ function setSleepQuality(value) {
 }
 
 function setSleepHours(value) {
-  const key = todayKey();
+  const key = activeDate;
   if (!state.sleep[key]) state.sleep[key] = {};
   state.sleep[key].hours = value;
   saveState();
@@ -728,14 +1020,14 @@ function sleepCategory(score) {
 }
 
 function renderSleep() {
-  const today = getTodaySleep();
-  const quality = today.quality != null ? today.quality : 5;
+  const entry = getActiveSleep();
+  const quality = entry.quality != null ? entry.quality : 5;
   sleepQualityValue.textContent = String(quality);
   sleepQualityInput.value = String(quality);
   gaugeFill.style.strokeDasharray = `${quality * 10} 100`;
-  sleepHoursInput.value = today.hours != null ? today.hours : "";
+  sleepHoursInput.value = entry.hours != null ? entry.hours : "";
 
-  const category = sleepCategory(computeSleepScore(today));
+  const category = sleepCategory(computeSleepScore(entry));
   const info = SLEEP_CATEGORY_INFO[category];
   sleepStatusEmoji.textContent = info.emoji;
   sleepStatusLabel.textContent = info.label;
@@ -747,15 +1039,19 @@ function renderSleep() {
 function renderSleepHeatmap() {
   sleepHeatmap.innerHTML = "";
   const days = buildHeatmapDays();
-  const today = todayKey();
+  const card = document.getElementById("sleepCard");
   for (const d of days) {
     const key = dateKey(d);
     const entry = state.sleep[key];
     const category = sleepCategory(computeSleepScore(entry));
     const info = SLEEP_CATEGORY_INFO[category];
     const cell = document.createElement("div");
-    cell.className = "heat-cell" + (category !== "none" ? ` sleep-${category}` : "") + (key === today ? " today" : "");
+    cell.className =
+      "heat-cell" +
+      (category !== "none" ? ` sleep-${category}` : "") +
+      (key === activeDate ? " today" : "");
     cell.title = `${key}: ${info.emoji} ${info.label}`;
+    cell.addEventListener("click", () => focusDate(key, card));
     sleepHeatmap.appendChild(cell);
   }
 }
@@ -771,10 +1067,11 @@ sleepHoursInput.addEventListener("change", (e) => {
 
 function renderStats() {
   const total = state.habits.length;
-  const doneToday = state.habits.filter((h) => h.dates[todayKey()]).length;
-  const pct = total === 0 ? 0 : Math.round((doneToday / total) * 100);
+  const doneOnActive = state.habits.filter((h) => h.dates[activeDate]).length;
+  const pct = total === 0 ? 0 : Math.round((doneOnActive / total) * 100);
 
   document.getElementById("statToday").textContent = `${pct}%`;
+  document.getElementById("statTodayLabel").textContent = isActiveToday() ? "Hoy" : "Día activo";
   document.getElementById("statHabits").textContent = String(total);
   document.getElementById("statBestStreak").textContent = String(computeBestStreakAcrossAll());
 }
@@ -810,6 +1107,7 @@ themeToggle.addEventListener("click", () => {
   applyTheme(saved || (prefersDark ? "dark" : "light"));
 })();
 
+renderDateBar();
 render();
 renderSleep();
 </script>
