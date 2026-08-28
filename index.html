@@ -624,6 +624,64 @@ table.data tr:last-child td { border-bottom: none; }
   color: var(--accent);
 }
 
+/* ---------- Touchdown times ---------- */
+
+.td-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.td-grid .field { min-width: 0; }
+
+.race-block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.race-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.race-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.race-meta {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+/* El segmento más lento de la carrera: ahí es donde se cae el ritmo. */
+td.slowest {
+  color: var(--warn);
+  font-weight: 700;
+}
+
+td.slowest::after {
+  content: " ▲";
+  font-size: 0.7rem;
+}
+
+.compare-picks {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+td.delta-worse { color: var(--danger); }
+td.delta-better { color: var(--accent); }
+
 .sleep-top {
   display: flex;
   align-items: center;
@@ -1120,6 +1178,56 @@ table.data tr:last-child td { border-bottom: none; }
         <table class="data" id="marksTable"></table>
       </div>
     </section>
+
+    <section class="card" id="racesCard">
+      <h2 class="card-title">🏁 Touchdown times</h2>
+
+      <form id="raceForm">
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="raceDateInput">Fecha</label>
+            <input type="date" id="raceDateInput" required>
+          </div>
+          <div class="field">
+            <label class="field-label" for="raceTargetInput">Tiempo objetivo (s)</label>
+            <input type="number" id="raceTargetInput" min="0" step="0.01" placeholder="opcional">
+          </div>
+        </div>
+
+        <div class="td-grid" id="raceInputs"></div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="raceNotesInput">Notas (opcional)</label>
+            <input type="text" id="raceNotesInput" maxlength="120" placeholder="ej. simulación con viento de frente">
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Guardar carrera</button>
+          <span class="muted" id="raceFormHint"></span>
+        </div>
+      </form>
+
+      <div id="racesList" style="margin-top: 24px;"></div>
+
+      <div id="raceCompare" hidden style="margin-top: 24px;">
+        <h3 class="card-title" style="font-size: 0.95rem;">Comparar por segmento</h3>
+        <div class="compare-picks">
+          <div class="field">
+            <label class="field-label" for="raceCompareA">Carrera A</label>
+            <select id="raceCompareA"></select>
+          </div>
+          <div class="field">
+            <label class="field-label" for="raceCompareB">Carrera B</label>
+            <select id="raceCompareB"></select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data" id="raceCompareTable"></table>
+        </div>
+      </div>
+    </section>
   </div>
 
   <template id="habitTemplate">
@@ -1353,6 +1461,8 @@ function setActiveDate(key) {
   renderGym();
   markDateInput.value = activeDate;
   renderMarks();
+  raceDateInput.value = activeDate;
+  renderRaces();
 }
 
 /** Salta a un día desde un heatmap y lleva la vista a la tarjeta de captura. */
@@ -2281,6 +2391,320 @@ markForm.addEventListener("submit", (e) => {
   addMark();
 });
 
+/* ---------- Touchdown times ---------- */
+
+/**
+ * Distancias exactas del 400 con vallas: la primera a 45 m, luego una cada
+ * 35 m, y 40 m de recta final después de la décima.
+ */
+const HURDLE_DISTANCES = [45, 80, 115, 150, 185, 220, 255, 290, 325, 360];
+const FINISH_DISTANCE = 400;
+
+/**
+ * Puntos de paso en orden: V1..V10 más meta.
+ *
+ * `uniform` marca los segmentos que miden los mismos 35 m y por lo tanto son
+ * comparables entre sí. La salida hasta V1 son 45 m desde tacos y la recta
+ * final son 40 m, así que entran en la tabla pero quedan fuera del cálculo
+ * del segmento más lento: si no, la salida ganaría siempre y el resaltado
+ * no diría nada sobre dónde se cae el ritmo.
+ */
+const CHECKPOINTS = HURDLE_DISTANCES.map((distance, i) => ({
+  key: String(i + 1),
+  label: `V${i + 1}`,
+  distance,
+  uniform: i > 0,
+})).concat([{ key: "finish", label: "meta", distance: FINISH_DISTANCE, uniform: false }]);
+
+const raceForm = document.getElementById("raceForm");
+const raceDateInput = document.getElementById("raceDateInput");
+const raceTargetInput = document.getElementById("raceTargetInput");
+const raceInputsEl = document.getElementById("raceInputs");
+const raceNotesInput = document.getElementById("raceNotesInput");
+const raceFormHint = document.getElementById("raceFormHint");
+const racesList = document.getElementById("racesList");
+const raceCompare = document.getElementById("raceCompare");
+const raceCompareA = document.getElementById("raceCompareA");
+const raceCompareB = document.getElementById("raceCompareB");
+const raceCompareTable = document.getElementById("raceCompareTable");
+
+(function buildRaceInputs() {
+  for (const point of CHECKPOINTS) {
+    const field = document.createElement("div");
+    field.className = "field";
+
+    const label = document.createElement("label");
+    label.className = "field-label";
+    label.textContent = `${point.label} · ${point.distance} m`;
+    label.setAttribute("for", `raceInput-${point.key}`);
+
+    const input = document.createElement("input");
+    input.type = "number";
+    input.id = `raceInput-${point.key}`;
+    input.min = "0";
+    input.step = "0.01";
+    input.placeholder = "s";
+
+    field.appendChild(label);
+    field.appendChild(input);
+    raceInputsEl.appendChild(field);
+  }
+})();
+
+/** Tiempo acumulado capturado en un punto de paso, o null. */
+function checkpointTime(race, point) {
+  const raw = point.key === "finish" ? race.finish : (race.touchdowns || {})[point.key];
+  const value = Number(raw);
+  return raw == null || raw === "" || !isFinite(value) ? null : value;
+}
+
+/**
+ * Por cada punto: tiempo acumulado y tiempo del segmento, es decir la
+ * diferencia contra la valla anterior. Sin la anterior el segmento no se
+ * puede calcular y queda en null.
+ */
+function raceSegments(race) {
+  return CHECKPOINTS.map((point, i) => {
+    const cumulative = checkpointTime(race, point);
+    let segment = null;
+    if (cumulative != null) {
+      const previous = i === 0 ? 0 : checkpointTime(race, CHECKPOINTS[i - 1]);
+      if (previous != null) segment = cumulative - previous;
+    }
+    return { point, cumulative, segment };
+  });
+}
+
+/** Segmento más lento entre los tramos comparables de 35 m (V2 a V10). */
+function slowestSegmentIndex(rows) {
+  let index = -1;
+  let worst = -Infinity;
+  rows.forEach((row, i) => {
+    if (row.point.uniform && row.segment != null && row.segment > worst) {
+      worst = row.segment;
+      index = i;
+    }
+  });
+  return index;
+}
+
+function raceLabel(race) {
+  return `${race.date}${race.finish != null ? ` · ${Number(race.finish).toFixed(2)} s` : ""}`;
+}
+
+function addRace() {
+  const touchdowns = {};
+  let captured = 0;
+  for (const point of CHECKPOINTS) {
+    const raw = document.getElementById(`raceInput-${point.key}`).value;
+    if (raw === "") continue;
+    const value = Number(raw);
+    if (!isFinite(value) || value < 0) continue;
+    captured++;
+    if (point.key !== "finish") touchdowns[point.key] = value;
+  }
+  const finishRaw = document.getElementById("raceInput-finish").value;
+  const finish = finishRaw === "" ? null : Number(finishRaw);
+
+  if (!captured) {
+    raceFormHint.textContent = "Captura al menos un tiempo de paso.";
+    return;
+  }
+
+  const targetRaw = raceTargetInput.value;
+  state.races.push({
+    id: uid(),
+    date: raceDateInput.value || activeDate,
+    targetTime: targetRaw === "" ? null : Number(targetRaw),
+    touchdowns,
+    finish,
+    notes: raceNotesInput.value.trim(),
+  });
+  saveState();
+
+  for (const point of CHECKPOINTS) document.getElementById(`raceInput-${point.key}`).value = "";
+  raceTargetInput.value = "";
+  raceNotesInput.value = "";
+  raceFormHint.textContent = "Carrera guardada.";
+  renderRaces();
+}
+
+function buildRaceTable(race) {
+  const rows = raceSegments(race);
+  const slowest = slowestSegmentIndex(rows);
+
+  const table = document.createElement("table");
+  table.className = "data";
+
+  const head = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  for (const label of ["Valla", "Distancia", "Acumulado", "Segmento"]) {
+    const th = document.createElement("th");
+    th.textContent = label;
+    headRow.appendChild(th);
+  }
+  head.appendChild(headRow);
+  table.appendChild(head);
+
+  const body = document.createElement("tbody");
+  rows.forEach((row, i) => {
+    const tr = document.createElement("tr");
+
+    const name = document.createElement("td");
+    name.textContent = row.point.label;
+    tr.appendChild(name);
+
+    const distance = document.createElement("td");
+    distance.textContent = `${row.point.distance} m`;
+    tr.appendChild(distance);
+
+    const cumulative = document.createElement("td");
+    cumulative.className = "num";
+    cumulative.textContent = row.cumulative == null ? "—" : row.cumulative.toFixed(2);
+    tr.appendChild(cumulative);
+
+    const segment = document.createElement("td");
+    segment.className = "num" + (i === slowest ? " slowest" : "");
+    segment.textContent = row.segment == null ? "—" : row.segment.toFixed(2);
+    if (i === slowest) segment.title = "Segmento más lento de esta carrera";
+    tr.appendChild(segment);
+
+    body.appendChild(tr);
+  });
+  table.appendChild(body);
+
+  const wrap = document.createElement("div");
+  wrap.className = "table-wrap";
+  wrap.appendChild(table);
+  return wrap;
+}
+
+function renderRacesList() {
+  racesList.innerHTML = "";
+  if (!state.races.length) {
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = "Todavía no hay carreras registradas.";
+    racesList.appendChild(empty);
+    return;
+  }
+
+  const races = state.races.slice().sort((a, b) => b.date.localeCompare(a.date));
+  for (const race of races) {
+    const block = document.createElement("div");
+    block.className = "race-block";
+
+    const head = document.createElement("div");
+    head.className = "race-head";
+
+    const title = document.createElement("span");
+    title.className = "race-title";
+    title.textContent = raceLabel(race);
+    head.appendChild(title);
+
+    const meta = document.createElement("span");
+    meta.className = "race-meta";
+    const bits = [];
+    if (race.targetTime != null) bits.push(`objetivo ${Number(race.targetTime).toFixed(2)} s`);
+    if (race.notes) bits.push(race.notes);
+    meta.textContent = bits.join(" · ");
+    head.appendChild(meta);
+
+    block.appendChild(head);
+    block.appendChild(buildRaceTable(race));
+    racesList.appendChild(block);
+  }
+}
+
+function renderRaceCompare() {
+  const races = state.races.slice().sort((a, b) => b.date.localeCompare(a.date));
+  raceCompare.hidden = races.length < 2;
+  if (races.length < 2) return;
+
+  const previousA = raceCompareA.value;
+  const previousB = raceCompareB.value;
+
+  for (const select of [raceCompareA, raceCompareB]) {
+    select.innerHTML = "";
+    for (const race of races) {
+      const option = document.createElement("option");
+      option.value = race.id;
+      option.textContent = raceLabel(race);
+      select.appendChild(option);
+    }
+  }
+  raceCompareA.value = races.some((r) => r.id === previousA) ? previousA : races[0].id;
+  raceCompareB.value = races.some((r) => r.id === previousB) ? previousB : races[1].id;
+
+  const raceA = races.find((r) => r.id === raceCompareA.value);
+  const raceB = races.find((r) => r.id === raceCompareB.value);
+  const rowsA = raceSegments(raceA);
+  const rowsB = raceSegments(raceB);
+  const slowestA = slowestSegmentIndex(rowsA);
+  const slowestB = slowestSegmentIndex(rowsB);
+
+  raceCompareTable.innerHTML = "";
+  const head = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  for (const label of ["Valla", "Distancia", "A", "B", "Δ"]) {
+    const th = document.createElement("th");
+    th.textContent = label;
+    headRow.appendChild(th);
+  }
+  head.appendChild(headRow);
+  raceCompareTable.appendChild(head);
+
+  const body = document.createElement("tbody");
+  CHECKPOINTS.forEach((point, i) => {
+    const tr = document.createElement("tr");
+
+    const name = document.createElement("td");
+    name.textContent = point.label;
+    tr.appendChild(name);
+
+    const distance = document.createElement("td");
+    distance.textContent = `${point.distance} m`;
+    tr.appendChild(distance);
+
+    const a = document.createElement("td");
+    a.className = "num" + (i === slowestA ? " slowest" : "");
+    a.textContent = rowsA[i].segment == null ? "—" : rowsA[i].segment.toFixed(2);
+    tr.appendChild(a);
+
+    const b = document.createElement("td");
+    b.className = "num" + (i === slowestB ? " slowest" : "");
+    b.textContent = rowsB[i].segment == null ? "—" : rowsB[i].segment.toFixed(2);
+    tr.appendChild(b);
+
+    const delta = document.createElement("td");
+    delta.className = "num";
+    if (rowsA[i].segment == null || rowsB[i].segment == null) {
+      delta.textContent = "—";
+    } else {
+      const value = rowsB[i].segment - rowsA[i].segment;
+      delta.textContent = `${value > 0 ? "+" : ""}${value.toFixed(2)}`;
+      if (Math.abs(value) >= 0.005) delta.classList.add(value > 0 ? "delta-worse" : "delta-better");
+    }
+    tr.appendChild(delta);
+
+    body.appendChild(tr);
+  });
+  raceCompareTable.appendChild(body);
+}
+
+function renderRaces() {
+  renderRacesList();
+  renderRaceCompare();
+}
+
+raceCompareA.addEventListener("change", renderRaceCompare);
+raceCompareB.addEventListener("change", renderRaceCompare);
+
+raceForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  addRace();
+});
+
 function renderStats() {
   const total = state.habits.length;
   const doneOnActive = state.habits.filter((h) => h.dates[activeDate]).length;
@@ -2332,6 +2756,8 @@ renderDraftSets();
 renderGym();
 markDateInput.value = activeDate;
 renderMarks();
+raceDateInput.value = activeDate;
+renderRaces();
 </script>
 </body>
 </html>
