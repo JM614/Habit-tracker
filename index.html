@@ -1251,6 +1251,22 @@ const SCHEMA_VERSION = 2;
 const THEME_KEY = "habit-tracker-theme";
 const WEEKS_VISIBLE = 12;
 
+/**
+ * Hábitos de arranque. Sólo se precargan cuando no hay absolutamente nada
+ * guardado: si ya existe un estado, aunque su lista de hábitos esté vacía,
+ * se respeta tal cual. Borrarlos todos es una decisión, no un primer arranque.
+ */
+const DEFAULT_HABITS = [
+  "Activación de glúteo (8 min)",
+  "Movilidad de cadera",
+  "Remolque de pierna izquierda (8 por lado)",
+  "Estiramiento post-entreno",
+  "Desayuno antes de entrenar",
+  "Proteína en las 3 comidas",
+  "2 litros de agua",
+  "Dormir antes de las 22:00",
+];
+
 const noticeEl = document.getElementById("notice");
 const activeDateInput = document.getElementById("activeDateInput");
 const prevDayBtn = document.getElementById("prevDayBtn");
@@ -1369,6 +1385,16 @@ function migrateFromV1(rawV1) {
   return migrated;
 }
 
+function seedDefaultHabits(target) {
+  target.habits = DEFAULT_HABITS.map((name) => ({
+    id: uid(),
+    name,
+    dates: {},
+    createdAt: todayKey(),
+  }));
+  return target;
+}
+
 function loadState() {
   const rawV2 = readRaw(STORAGE_KEY);
   if (rawV2 != null) {
@@ -1403,7 +1429,10 @@ function loadState() {
     }
   }
 
-  return createEmptyState();
+  // Primer arranque de verdad: no hay ni v2 ni v1 que migrar.
+  const fresh = seedDefaultHabits(createEmptyState());
+  writeRaw(STORAGE_KEY, JSON.stringify(fresh));
+  return fresh;
 }
 
 function saveState() {
