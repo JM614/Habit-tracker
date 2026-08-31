@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Temporada</title>
+<title>Rastreador de hábitos</title>
 <style>
 :root {
   --bg: #e9e5d8;
@@ -20,6 +20,8 @@
   --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
   --radius: 14px;
   --cell: 11px;
+  --month-row: 13px;
+  --month-gap: 9px;
 }
 
 [data-theme="dark"] {
@@ -682,63 +684,53 @@ table.data tr:last-child td { border-bottom: none; }
   color: var(--accent);
 }
 
-/* ---------- Touchdown times ---------- */
+/* ---------- Pruebas de fin de mes ---------- */
 
-.td-grid {
+.tests-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.td-grid .field { min-width: 0; }
-
-.race-block {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px;
-  margin-bottom: 12px;
-}
-
-.race-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
-
-.race-title {
-  font-weight: 700;
-  font-size: 0.95rem;
-}
-
-.race-meta {
-  font-size: 0.78rem;
-  color: var(--text-dim);
-}
-
-/* El segmento más lento de la carrera: ahí es donde se cae el ritmo. */
-td.slowest {
-  color: var(--warn);
-  font-weight: 700;
-}
-
-td.slowest::after {
-  content: " ▲";
-  font-size: 0.7rem;
-}
-
-.compare-picks {
-  display: flex;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 12px;
-  flex-wrap: wrap;
   margin-bottom: 14px;
 }
 
-td.delta-worse { color: var(--danger); }
-td.delta-better { color: var(--accent); }
+.tests-grid .field { min-width: 0; }
+
+/* La primera columna se queda fija: sin esto, al hacer scroll lateral en el
+   celular no se sabe qué prueba se está viendo. */
+.tests-table th.test-name,
+.tests-table td.test-name {
+  position: sticky;
+  left: 0;
+  background: var(--surface);
+  z-index: 1;
+  border-right: 1px solid var(--border);
+}
+
+.tests-table th.test-name { z-index: 2; }
+
+.tests-table td.num,
+.tests-table th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tests-table td.nd { color: var(--text-dim); opacity: 0.6; }
+
+/* Mejor marca histórica de la prueba, según su dirección. */
+.tests-table td.best {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.tests-table td.up { color: var(--accent); }
+.tests-table td.down { color: var(--danger); }
+
+.tests-table th.summary-col,
+.tests-table td.summary-col {
+  border-left: 1px solid var(--border);
+}
+
+.summary-value.warn { color: var(--warn); }
 
 .sleep-top {
   display: flex;
@@ -1050,12 +1042,13 @@ td.delta-better { color: var(--accent); }
   min-width: 0;
 }
 
+/* La primera fila es la de etiquetas de mes; el eje lleva un hueco del mismo
+   alto para que las siete letras sigan alineadas con sus filas de celdas. */
 .heatmap-axis {
   display: grid;
-  grid-template-rows: repeat(7, var(--cell));
+  grid-template-rows: var(--month-row) repeat(7, var(--cell));
   gap: 3px;
   flex-shrink: 0;
-  padding-top: 0;
 }
 
 .heatmap-axis span {
@@ -1068,12 +1061,21 @@ td.delta-better { color: var(--accent); }
 
 .heatmap {
   display: grid;
-  grid-template-rows: repeat(7, var(--cell));
-  grid-auto-flow: column;
+  grid-template-rows: var(--month-row) repeat(7, var(--cell));
   gap: 3px;
   overflow-x: auto;
   padding-bottom: 4px;
   min-width: 0;
+}
+
+.heatmap-month-label {
+  grid-row: 1;
+  font-size: 0.6rem;
+  line-height: var(--month-row);
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-align: left;
 }
 
 .heat-cell {
@@ -1086,7 +1088,7 @@ td.delta-better { color: var(--accent); }
 
 /* Si el gesto principal es tocar una celda, 11 px es muy chico para el dedo. */
 @media (max-width: 640px) {
-  :root { --cell: 15px; }
+  :root { --cell: 15px; --month-gap: 11px; }
   .heat-cell { border-radius: 3px; }
   .heatmap-axis span { font-size: 0.62rem; }
 }
@@ -1120,7 +1122,7 @@ td.delta-better { color: var(--accent); }
 <body>
   <div class="app">
     <header>
-      <h1>Temporada</h1>
+      <h1>Rastreador de hábitos</h1>
       <div class="header-actions">
         <button id="exportBtn" class="icon-btn" title="Exportar datos" aria-label="Exportar datos">⬇️</button>
         <button id="importBtn" class="icon-btn" title="Importar datos" aria-label="Importar datos">⬆️</button>
@@ -1334,53 +1336,42 @@ td.delta-better { color: var(--accent); }
       </div>
     </section>
 
-    <section class="card" id="racesCard">
-      <h2 class="card-title">🏁 Touchdown times</h2>
+    <section class="card" id="testsCard">
+      <h2 class="card-title">📐 Pruebas de fin de mes</h2>
+      <p class="muted" style="margin: -8px 0 16px;">
+        La batería de doce pruebas de la quinta semana. Es independiente del módulo de marcas:
+        allí van los tramos sueltos de entrenamiento y competencia.
+      </p>
 
-      <form id="raceForm">
+      <div class="summary-cards">
+        <div class="summary-card" id="asymmetryCard">
+          <span class="summary-value none" id="asymmetryValue">—</span>
+          <span class="summary-label" id="asymmetryLabel">Asimetría triple izq/der</span>
+        </div>
+      </div>
+      <p class="muted" id="asymmetryNote" style="font-size: 0.76rem; margin: -8px 0 20px;">
+        El 10 % es una referencia habitual para asimetría entre piernas, no una regla dura.
+        Coméntalo con tu fisio antes de sacar conclusiones.
+      </p>
+
+      <form id="testsForm">
         <div class="field-row">
-          <div class="field">
-            <label class="field-label" for="raceDateInput">Fecha</label>
-            <input type="date" id="raceDateInput" required>
-          </div>
-          <div class="field">
-            <label class="field-label" for="raceTargetInput">Tiempo objetivo (s)</label>
-            <input type="number" id="raceTargetInput" min="0" step="0.01" placeholder="opcional">
+          <div class="field" style="max-width: 220px;">
+            <label class="field-label" for="testMonthInput">Mes</label>
+            <input type="month" id="testMonthInput" required>
           </div>
         </div>
 
-        <div class="td-grid" id="raceInputs"></div>
-
-        <div class="field-row">
-          <div class="field">
-            <label class="field-label" for="raceNotesInput">Notas (opcional)</label>
-            <input type="text" id="raceNotesInput" maxlength="120" placeholder="ej. simulación con viento de frente">
-          </div>
-        </div>
+        <div class="tests-grid" id="testsInputs"></div>
 
         <div class="form-actions">
-          <button type="submit" class="btn-primary">Guardar carrera</button>
-          <span class="muted" id="raceFormHint"></span>
+          <button type="submit" class="btn-primary">Guardar mes</button>
+          <span class="muted" id="testsFormHint"></span>
         </div>
       </form>
 
-      <div id="racesList" style="margin-top: 24px;"></div>
-
-      <div id="raceCompare" hidden style="margin-top: 24px;">
-        <h3 class="card-title" style="font-size: 0.95rem;">Comparar por segmento</h3>
-        <div class="compare-picks">
-          <div class="field">
-            <label class="field-label" for="raceCompareA">Carrera A</label>
-            <select id="raceCompareA"></select>
-          </div>
-          <div class="field">
-            <label class="field-label" for="raceCompareB">Carrera B</label>
-            <select id="raceCompareB"></select>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table class="data" id="raceCompareTable"></table>
-        </div>
+      <div class="table-wrap" style="margin-top: 24px;">
+        <table class="data tests-table" id="testsTable"></table>
       </div>
     </section>
     </div>
@@ -1433,10 +1424,11 @@ td.delta-better { color: var(--accent); }
   </template>
 
 <script>
-const STORAGE_KEY_V1 = "habit-tracker-data-v1";
-const STORAGE_KEY = "habit-tracker-data-v2";
+const STORAGE_KEY = "habit-tracker-data-v3";
+/** Llaves de esquemas anteriores, de la más reciente a la más antigua. */
+const LEGACY_KEYS = ["habit-tracker-data-v2", "habit-tracker-data-v1"];
 const BACKUP_PREFIX = "habit-tracker-backup-";
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const THEME_KEY = "habit-tracker-theme";
 const WEEKS_VISIBLE = 26;
 
@@ -1526,6 +1518,7 @@ function createEmptyState() {
     gym: [],
     marks: [],
     races: [],
+    tests: {},
   };
 }
 
@@ -1554,6 +1547,7 @@ function normalizeState(input) {
   if (Array.isArray(input.gym)) out.gym = input.gym.filter(isPlainObject);
   if (Array.isArray(input.marks)) out.marks = input.marks.filter(isPlainObject);
   if (Array.isArray(input.races)) out.races = input.races.filter(isPlainObject);
+  if (isPlainObject(input.tests)) out.tests = input.tests;
 
   return out;
 }
@@ -1565,11 +1559,13 @@ function backupCorrupt(sourceKey, raw) {
 }
 
 /**
- * Migra habit-tracker-data-v1 a v2. La llave v1 NO se borra ni se sobrescribe:
- * queda como respaldo de los datos ya capturados.
+ * Migra un estado de un esquema anterior al actual. normalizeState() agrega
+ * vacías las colecciones que ese esquema no tenía, así que la misma función
+ * sirve para v1→v3 y para v2→v3. La llave de origen NO se borra ni se
+ * sobrescribe: queda como respaldo de los datos ya capturados.
  */
-function migrateFromV1(rawV1) {
-  const migrated = normalizeState(JSON.parse(rawV1));
+function migrateLegacy(legacyRaw) {
+  const migrated = normalizeState(JSON.parse(legacyRaw));
   migrated.schemaVersion = SCHEMA_VERSION;
   writeRaw(STORAGE_KEY, JSON.stringify(migrated));
   return migrated;
@@ -1586,12 +1582,12 @@ function seedDefaultHabits(target) {
 }
 
 function loadState() {
-  const rawV2 = readRaw(STORAGE_KEY);
-  if (rawV2 != null) {
+  const raw = readRaw(STORAGE_KEY);
+  if (raw != null) {
     try {
-      return normalizeState(JSON.parse(rawV2));
+      return normalizeState(JSON.parse(raw));
     } catch (e) {
-      backupCorrupt(STORAGE_KEY, rawV2);
+      backupCorrupt(STORAGE_KEY, raw);
       showNotice(
         "Los datos guardados estaban dañados y no se pudieron leer. Se guardó una copia del texto original y la página arrancó vacía.",
         "warn"
@@ -1600,17 +1596,20 @@ function loadState() {
     }
   }
 
-  const rawV1 = readRaw(STORAGE_KEY_V1);
-  if (rawV1 != null) {
+  // Migrar desde el esquema anterior más reciente que exista. Ninguna llave
+  // vieja se borra ni se sobrescribe: v1 y v2 quedan como respaldo.
+  for (const legacyKey of LEGACY_KEYS) {
+    const legacyRaw = readRaw(legacyKey);
+    if (legacyRaw == null) continue;
     try {
-      const migrated = migrateFromV1(rawV1);
+      const migrated = migrateLegacy(legacyRaw);
       showNotice(
-        "Datos migrados a la versión 2. La copia anterior sigue guardada como respaldo.",
+        `Datos migrados a la versión ${SCHEMA_VERSION}. Las copias anteriores siguen guardadas como respaldo.`,
         "ok"
       );
       return migrated;
     } catch (e) {
-      backupCorrupt(STORAGE_KEY_V1, rawV1);
+      backupCorrupt(legacyKey, legacyRaw);
       showNotice(
         "No se pudo migrar el respaldo anterior porque estaba dañado. Se guardó una copia del texto original y la página arrancó vacía.",
         "warn"
@@ -1619,7 +1618,7 @@ function loadState() {
     }
   }
 
-  // Primer arranque de verdad: no hay ni v2 ni v1 que migrar.
+  // Primer arranque de verdad: no hay ningún esquema previo que migrar.
   const fresh = seedDefaultHabits(createEmptyState());
   writeRaw(STORAGE_KEY, JSON.stringify(fresh));
   return fresh;
@@ -1679,8 +1678,7 @@ function renderAll() {
   renderGym();
   markDateInput.value = activeDate;
   renderMarks();
-  raceDateInput.value = activeDate;
-  renderRaces();
+  renderTests();
   renderSummary();
 }
 
@@ -1857,6 +1855,8 @@ function ensureHeatmapAxis(container) {
   const axis = document.createElement("div");
   axis.className = "heatmap-axis";
   axis.setAttribute("aria-hidden", "true");
+  // Hueco que corresponde a la fila de etiquetas de mes del heatmap.
+  axis.appendChild(document.createElement("span"));
   for (const label of WEEKDAY_LABELS) {
     const span = document.createElement("span");
     span.textContent = label;
@@ -1869,13 +1869,93 @@ function ensureHeatmapAxis(container) {
   return wrap;
 }
 
+const MONTH_LABELS = [
+  "ene", "feb", "mar", "abr", "may", "jun",
+  "jul", "ago", "sep", "oct", "nov", "dic",
+];
+
+/**
+ * Pinta un heatmap agrupado por mes: cada columna es una semana y pertenece al
+ * mes de su lunes. Entre un mes y el siguiente queda un hueco visible, y cada
+ * grupo lleva su etiqueta encima. Con 26 semanas a la vista, sin esto la
+ * cuadrícula es una tira de días sin ninguna referencia de dónde acaba un mes.
+ *
+ * El orden es del más reciente al más antiguo de izquierda a derecha: lo que
+ * se mira todos los días es la semana en curso, y así queda a la vista sin
+ * tener que arrastrar la barra hasta el final. Las filas siguen siendo lunes
+ * a domingo de arriba abajo.
+ *
+ * `makeCell(key, date)` devuelve la celda ya configurada. Devuelve un Map de
+ * fecha -> celda para poder actualizarlas de a una.
+ */
+function paintHeatmap(container, makeCell) {
+  container.innerHTML = "";
+  const days = buildHeatmapDays();
+
+  const weeks = [];
+  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+
+  const groups = [];
+  for (const week of weeks) {
+    const monday = week[0];
+    const last = groups[groups.length - 1];
+    if (last && last.month === monday.getMonth() && last.year === monday.getFullYear()) {
+      last.weeks.push(week);
+    } else {
+      groups.push({ month: monday.getMonth(), year: monday.getFullYear(), weeks: [week] });
+    }
+  }
+
+  // Orden de pintado: el mes más reciente primero, o sea en la columna 1.
+  const ordered = groups.slice().reverse();
+
+  // Pista de columnas: las semanas de cada mes, con un hueco entre meses.
+  const tracks = [];
+  const startColumns = [];
+  for (const group of ordered) {
+    if (tracks.length) tracks.push("var(--month-gap)");
+    startColumns.push(tracks.length + 1);
+    for (let i = 0; i < group.weeks.length; i++) tracks.push("var(--cell)");
+  }
+  container.style.gridTemplateColumns = tracks.join(" ");
+
+  const cells = new Map();
+  ordered.forEach((group, index) => {
+    const startColumn = startColumns[index];
+    const previous = ordered[index - 1];
+    const lastWeek = group.weeks.length - 1;
+
+    const label = document.createElement("span");
+    label.className = "heatmap-month-label";
+    // El año sólo cuando cambia respecto del mes que queda a su izquierda:
+    // "ene" a secas sería ambiguo pegado a "dic" del año anterior.
+    const showYear = !previous || previous.year !== group.year;
+    label.textContent =
+      MONTH_LABELS[group.month] + (showYear ? ` ${String(group.year).slice(2)}` : "");
+    label.style.gridColumn = `${startColumn} / span ${group.weeks.length}`;
+    container.appendChild(label);
+
+    group.weeks.forEach((week, weekIndex) => {
+      // Dentro del mes también se invierte: la semana más reciente del grupo
+      // queda pegada al grupo del mes siguiente, que está a su izquierda.
+      const column = startColumn + (lastWeek - weekIndex);
+      week.forEach((date, weekday) => {
+        const key = dateKey(date);
+        const cell = makeCell(key, date);
+        cell.style.gridColumn = String(column);
+        cell.style.gridRow = String(weekday + 2);
+        container.appendChild(cell);
+        cells.set(key, cell);
+      });
+    });
+  });
+
+  return cells;
+}
 /** Devuelve un Map de fecha -> celda, para poder actualizarlas de a una. */
 function renderHeatmap(container, habit) {
   ensureHeatmapAxis(container);
-  container.innerHTML = "";
-  const cells = new Map();
-  for (const d of buildHeatmapDays()) {
-    const key = dateKey(d);
+  return paintHeatmap(container, (key) => {
     const cell = document.createElement("div");
     cell.className =
       "heat-cell" + (habit.dates[key] ? " on" : "") + (key === activeDate ? " today" : "");
@@ -1885,10 +1965,8 @@ function renderHeatmap(container, habit) {
       toggleDate(habit, key);
       if (key !== activeDate) setActiveDate(key);
     });
-    container.appendChild(cell);
-    cells.set(key, cell);
-  }
-  return cells;
+    return cell;
+  });
 }
 
 function updateStreakLabel(el, habit) {
@@ -2080,19 +2158,17 @@ function renderLeg(leg) {
 
 function renderPainHeatmap(container, field) {
   ensureHeatmapAxis(container);
-  container.innerHTML = "";
   const card = document.getElementById("recoveryCard");
-  for (const d of buildHeatmapDays()) {
-    const key = dateKey(d);
+  paintHeatmap(container, (key) => {
     const value = getPain(key, field);
-    const cell = document.createElement("div");
     const level = value == null ? null : painLevel(value);
+    const cell = document.createElement("div");
     cell.className =
       "heat-cell" + (level ? ` ${level.cls}` : "") + (key === activeDate ? " today" : "");
     cell.title = value == null ? `${key}: sin registrar` : `${key}: ${value}/10 · ${level.label}`;
     cell.addEventListener("click", () => focusDate(key, card));
-    container.appendChild(cell);
-  }
+    return cell;
+  });
 }
 
 /** Un día cuenta como registrado si al menos una pierna tiene valor. */
@@ -2268,11 +2344,8 @@ function renderSleep() {
 
 function renderSleepHeatmap() {
   ensureHeatmapAxis(sleepHeatmap);
-  sleepHeatmap.innerHTML = "";
-  const days = buildHeatmapDays();
   const card = document.getElementById("sleepCard");
-  for (const d of days) {
-    const key = dateKey(d);
+  paintHeatmap(sleepHeatmap, (key) => {
     const entry = state.sleep[key];
     const category = sleepCategory(computeSleepScore(entry));
     const info = SLEEP_CATEGORY_INFO[category];
@@ -2283,8 +2356,8 @@ function renderSleepHeatmap() {
       (key === activeDate ? " today" : "");
     cell.title = `${key}: ${info.emoji} ${info.label}`;
     cell.addEventListener("click", () => focusDate(key, card));
-    sleepHeatmap.appendChild(cell);
-  }
+    return cell;
+  });
 }
 
 // Mismo problema que los sliders de isquio: éste arranca en 5, así que tocar
@@ -2801,6 +2874,326 @@ markForm.addEventListener("submit", (e) => {
   addMark();
 });
 
+/* ---------- Pruebas de fin de mes ---------- */
+
+/**
+ * Las doce pruebas de la quinta semana. `better` es la dirección: en 40 m
+ * bajar de 5.60 a 5.45 es una mejora, y en sentadilla subir de 100 a 110 kg
+ * también. Tratar "más grande" como "mejor" sería un error en la mitad de las
+ * filas, así que la dirección vive aquí y la usan tanto el resaltado de la
+ * mejor marca como la columna de diferencia.
+ */
+const MONTHLY_TESTS = [
+  { id: "m40", name: "40 m", unit: "s", format: "sprint", better: "lower" },
+  { id: "m60", name: "60 m", unit: "s", format: "sprint", better: "lower" },
+  { id: "m600", name: "600 m", unit: "m:ss.d", format: "duration", better: "lower" },
+  { id: "m1000", name: "1000 m", unit: "m:ss.d", format: "duration", better: "lower" },
+  { id: "saltoSI", name: "Salto sin impulso", unit: "m", format: "meters", better: "higher" },
+  { id: "tripleIzq", name: "Triple izquierdo", unit: "m", format: "meters", better: "higher" },
+  { id: "tripleDer", name: "Triple derecho", unit: "m", format: "meters", better: "higher" },
+  { id: "quintuple", name: "Quíntuple", unit: "m", format: "meters", better: "higher" },
+  { id: "pecho", name: "Pecho", unit: "kg", format: "kg", better: "higher" },
+  { id: "sentadilla", name: "Sentadilla", unit: "kg", format: "kg", better: "higher" },
+  { id: "clean", name: "Clean", unit: "kg", format: "kg", better: "higher" },
+  { id: "arranque", name: "Arranque", unit: "kg", format: "kg", better: "higher" },
+];
+
+/** Umbral de asimetría entre piernas, en porcentaje. */
+const ASYMMETRY_THRESHOLD = 10;
+
+const testsForm = document.getElementById("testsForm");
+const testMonthInput = document.getElementById("testMonthInput");
+const testsInputs = document.getElementById("testsInputs");
+const testsFormHint = document.getElementById("testsFormHint");
+const testsTable = document.getElementById("testsTable");
+const asymmetryValue = document.getElementById("asymmetryValue");
+const asymmetryLabel = document.getElementById("asymmetryLabel");
+
+function monthKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * Acepta "1:32.5" y "92.5" y devuelve segundos. Los tiempos de 600 y 1000 son
+ * de minutos: escribirlos en segundos es antinatural.
+ */
+function parseDuration(raw) {
+  const text = String(raw).trim().replace(",", ".");
+  if (!text) return null;
+  if (text.indexOf(":") !== -1) {
+    const [minPart, secPart] = text.split(":");
+    const minutes = Number(minPart);
+    const seconds = Number(secPart);
+    if (!isFinite(minutes) || !isFinite(seconds)) return null;
+    return minutes * 60 + seconds;
+  }
+  const value = Number(text);
+  return isFinite(value) ? value : null;
+}
+
+function parseTestValue(test, raw) {
+  if (test.format === "duration") return parseDuration(raw);
+  const text = String(raw).trim().replace(",", ".");
+  if (!text) return null;
+  const value = Number(text);
+  return isFinite(value) ? value : null;
+}
+
+function formatDuration(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds - minutes * 60;
+  return `${minutes}:${rest.toFixed(1).padStart(4, "0")}`;
+}
+
+function formatTestValue(test, value) {
+  if (value == null) return "ND";
+  if (test.format === "duration") return formatDuration(value);
+  if (test.format === "kg") return String(Math.round(value));
+  return value.toFixed(2);
+}
+
+/** Diferencia con signo. En las pruebas de tiempo se lee mejor en segundos. */
+function formatTestDelta(test, delta) {
+  const magnitude = Math.abs(delta);
+  const text =
+    test.format === "kg"
+      ? String(Math.round(magnitude))
+      : test.format === "duration"
+      ? magnitude.toFixed(1)
+      : magnitude.toFixed(2);
+  return `${delta < 0 ? "−" : "+"}${text}`;
+}
+
+function isImprovement(test, delta) {
+  return test.better === "lower" ? delta < 0 : delta > 0;
+}
+
+/** Meses con registro, en orden cronológico. */
+function testMonths() {
+  return Object.keys(state.tests).sort();
+}
+
+function testValue(month, test) {
+  const entry = state.tests[month];
+  if (!entry) return null;
+  const value = entry[test.id];
+  return typeof value === "number" && isFinite(value) ? value : null;
+}
+
+/** Mejor marca histórica de una prueba, respetando su dirección. */
+function bestTest(test) {
+  let best = null;
+  for (const month of testMonths()) {
+    const value = testValue(month, test);
+    if (value == null) continue;
+    if (best == null || (test.better === "lower" ? value < best.value : value > best.value)) {
+      best = { month, value };
+    }
+  }
+  return best;
+}
+
+/** Los dos meses más recientes con registro de esa prueba. */
+function lastTwoWithValue(test) {
+  const months = testMonths().filter((month) => testValue(month, test) != null);
+  return {
+    current: months.length ? months[months.length - 1] : null,
+    previous: months.length > 1 ? months[months.length - 2] : null,
+  };
+}
+
+(function buildTestInputs() {
+  for (const test of MONTHLY_TESTS) {
+    const field = document.createElement("div");
+    field.className = "field";
+
+    const label = document.createElement("label");
+    label.className = "field-label";
+    label.textContent = `${test.name} (${test.unit})`;
+    label.setAttribute("for", `testInput-${test.id}`);
+
+    const input = document.createElement("input");
+    input.id = `testInput-${test.id}`;
+    if (test.format === "duration") {
+      // Texto, para poder escribir "1:32.5" además de "92.5".
+      input.type = "text";
+      input.inputMode = "decimal";
+      input.placeholder = "1:32.5 o 92.5";
+    } else {
+      input.type = "number";
+      input.min = "0";
+      input.step = test.format === "kg" ? "1" : "0.01";
+      input.placeholder = test.format === "kg" ? "kg" : test.unit;
+    }
+
+    field.appendChild(label);
+    field.appendChild(input);
+    testsInputs.appendChild(field);
+  }
+})();
+
+/** Precarga el formulario con lo capturado ese mes, para poder corregirlo. */
+function loadMonthIntoForm() {
+  const entry = state.tests[testMonthInput.value] || {};
+  for (const test of MONTHLY_TESTS) {
+    const input = document.getElementById(`testInput-${test.id}`);
+    const value = typeof entry[test.id] === "number" ? entry[test.id] : null;
+    input.value = value == null ? "" : test.format === "duration" ? formatDuration(value) : String(value);
+  }
+}
+
+function saveTestMonth() {
+  const month = testMonthInput.value;
+  if (!month) {
+    testsFormHint.textContent = "Elige el mes.";
+    return;
+  }
+
+  const entry = {};
+  for (const test of MONTHLY_TESTS) {
+    const raw = document.getElementById(`testInput-${test.id}`).value;
+    const value = parseTestValue(test, raw);
+    // Un campo vacío significa que esa prueba no se hizo ese mes: no se inventa un cero.
+    if (value != null) entry[test.id] = value;
+  }
+
+  if (!Object.keys(entry).length) {
+    testsFormHint.textContent = "Captura al menos una prueba.";
+    return;
+  }
+
+  // Reemplaza el mes en vez de duplicarlo.
+  state.tests[month] = entry;
+  saveState();
+  testsFormHint.textContent = `Mes ${month} guardado.`;
+  renderTests();
+}
+
+/**
+ * Diferencia porcentual entre triple izquierdo y derecho, sobre la pierna más
+ * fuerte, en el mes más reciente que tenga ambos.
+ */
+function computeAsymmetry() {
+  const left = MONTHLY_TESTS.find((t) => t.id === "tripleIzq");
+  const right = MONTHLY_TESTS.find((t) => t.id === "tripleDer");
+  const months = testMonths().reverse();
+  for (const month of months) {
+    const l = testValue(month, left);
+    const r = testValue(month, right);
+    if (l == null || r == null) continue;
+    const strongest = Math.max(l, r);
+    if (strongest <= 0) continue;
+    return { month, percent: (Math.abs(l - r) / strongest) * 100, left: l, right: r };
+  }
+  return null;
+}
+
+function renderAsymmetry() {
+  const asymmetry = computeAsymmetry();
+  if (!asymmetry) {
+    asymmetryValue.textContent = "—";
+    asymmetryValue.className = "summary-value none";
+    asymmetryLabel.textContent = "Asimetría triple izq/der";
+    return;
+  }
+  // Se compara el valor ya redondeado, el mismo que se muestra: 7.20 contra
+  // 8.00 da 9.999999999999998 por coma flotante, y sería absurdo pintar
+  // "10.0 %" sin la advertencia.
+  const shown = Number(asymmetry.percent.toFixed(1));
+  asymmetryValue.textContent = `${shown.toFixed(1)} %`;
+  asymmetryValue.className = "summary-value" + (shown >= ASYMMETRY_THRESHOLD ? " warn" : "");
+  asymmetryLabel.textContent = `Asimetría triple izq/der · ${asymmetry.month}`;
+}
+
+function renderTestsTable() {
+  testsTable.innerHTML = "";
+  const months = testMonths();
+
+  const head = document.createElement("thead");
+  const headRow = document.createElement("tr");
+
+  const nameHead = document.createElement("th");
+  nameHead.className = "test-name";
+  nameHead.textContent = "Prueba";
+  headRow.appendChild(nameHead);
+
+  for (const month of months) {
+    const th = document.createElement("th");
+    th.className = "num";
+    th.textContent = month;
+    headRow.appendChild(th);
+  }
+  for (const label of ["vs mes anterior", "Mejor"]) {
+    const th = document.createElement("th");
+    th.className = "num summary-col";
+    th.textContent = label;
+    headRow.appendChild(th);
+  }
+  head.appendChild(headRow);
+  testsTable.appendChild(head);
+
+  const body = document.createElement("tbody");
+  for (const test of MONTHLY_TESTS) {
+    const tr = document.createElement("tr");
+
+    const name = document.createElement("td");
+    name.className = "test-name";
+    name.textContent = `${test.name} (${test.unit})`;
+    tr.appendChild(name);
+
+    const best = bestTest(test);
+    for (const month of months) {
+      const value = testValue(month, test);
+      const td = document.createElement("td");
+      td.className = "num" + (value == null ? " nd" : "") + (best && best.month === month ? " best" : "");
+      td.textContent = formatTestValue(test, value);
+      tr.appendChild(td);
+    }
+
+    const { current, previous } = lastTwoWithValue(test);
+    const deltaCell = document.createElement("td");
+    deltaCell.className = "num summary-col";
+    if (current && previous) {
+      const delta = testValue(current, test) - testValue(previous, test);
+      deltaCell.textContent = formatTestDelta(test, delta);
+      deltaCell.classList.add(isImprovement(test, delta) ? "up" : "down");
+      deltaCell.title = `${previous} → ${current}`;
+    } else {
+      deltaCell.textContent = "ND";
+      deltaCell.classList.add("nd");
+    }
+    tr.appendChild(deltaCell);
+
+    const bestCell = document.createElement("td");
+    bestCell.className = "num summary-col";
+    if (best) {
+      bestCell.textContent = `${formatTestValue(test, best.value)} (${best.month})`;
+    } else {
+      bestCell.textContent = "ND";
+      bestCell.classList.add("nd");
+    }
+    tr.appendChild(bestCell);
+
+    body.appendChild(tr);
+  }
+  testsTable.appendChild(body);
+}
+
+function renderTests() {
+  renderTestsTable();
+  renderAsymmetry();
+}
+
+testMonthInput.addEventListener("change", () => {
+  testsFormHint.textContent = "";
+  loadMonthIntoForm();
+});
+
+testsForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  saveTestMonth();
+});
+
 /* ---------- Touchdown times ---------- */
 
 /**
@@ -2826,294 +3219,6 @@ const CHECKPOINTS = HURDLE_DISTANCES.map((distance, i) => ({
   uniform: i > 0,
 })).concat([{ key: "finish", label: "meta", distance: FINISH_DISTANCE, uniform: false }]);
 
-const raceForm = document.getElementById("raceForm");
-const raceDateInput = document.getElementById("raceDateInput");
-const raceTargetInput = document.getElementById("raceTargetInput");
-const raceInputsEl = document.getElementById("raceInputs");
-const raceNotesInput = document.getElementById("raceNotesInput");
-const raceFormHint = document.getElementById("raceFormHint");
-const racesList = document.getElementById("racesList");
-const raceCompare = document.getElementById("raceCompare");
-const raceCompareA = document.getElementById("raceCompareA");
-const raceCompareB = document.getElementById("raceCompareB");
-const raceCompareTable = document.getElementById("raceCompareTable");
-
-(function buildRaceInputs() {
-  for (const point of CHECKPOINTS) {
-    const field = document.createElement("div");
-    field.className = "field";
-
-    const label = document.createElement("label");
-    label.className = "field-label";
-    label.textContent = `${point.label} · ${point.distance} m`;
-    label.setAttribute("for", `raceInput-${point.key}`);
-
-    const input = document.createElement("input");
-    input.type = "number";
-    input.id = `raceInput-${point.key}`;
-    input.min = "0";
-    input.step = "0.01";
-    input.placeholder = "s";
-
-    field.appendChild(label);
-    field.appendChild(input);
-    raceInputsEl.appendChild(field);
-  }
-})();
-
-/** Tiempo acumulado capturado en un punto de paso, o null. */
-function checkpointTime(race, point) {
-  const raw = point.key === "finish" ? race.finish : (race.touchdowns || {})[point.key];
-  const value = Number(raw);
-  return raw == null || raw === "" || !isFinite(value) ? null : value;
-}
-
-/**
- * Por cada punto: tiempo acumulado y tiempo del segmento, es decir la
- * diferencia contra la valla anterior. Sin la anterior el segmento no se
- * puede calcular y queda en null.
- */
-function raceSegments(race) {
-  return CHECKPOINTS.map((point, i) => {
-    const cumulative = checkpointTime(race, point);
-    let segment = null;
-    if (cumulative != null) {
-      const previous = i === 0 ? 0 : checkpointTime(race, CHECKPOINTS[i - 1]);
-      if (previous != null) segment = cumulative - previous;
-    }
-    return { point, cumulative, segment };
-  });
-}
-
-/** Segmento más lento entre los tramos comparables de 35 m (V2 a V10). */
-function slowestSegmentIndex(rows) {
-  let index = -1;
-  let worst = -Infinity;
-  rows.forEach((row, i) => {
-    if (row.point.uniform && row.segment != null && row.segment > worst) {
-      worst = row.segment;
-      index = i;
-    }
-  });
-  return index;
-}
-
-function raceLabel(race) {
-  return `${race.date}${race.finish != null ? ` · ${Number(race.finish).toFixed(2)} s` : ""}`;
-}
-
-function addRace() {
-  const touchdowns = {};
-  let captured = 0;
-  for (const point of CHECKPOINTS) {
-    const raw = document.getElementById(`raceInput-${point.key}`).value;
-    if (raw === "") continue;
-    const value = Number(raw);
-    if (!isFinite(value) || value < 0) continue;
-    captured++;
-    if (point.key !== "finish") touchdowns[point.key] = value;
-  }
-  const finishRaw = document.getElementById("raceInput-finish").value;
-  const finish = finishRaw === "" ? null : Number(finishRaw);
-
-  if (!captured) {
-    raceFormHint.textContent = "Captura al menos un tiempo de paso.";
-    return;
-  }
-
-  const targetRaw = raceTargetInput.value;
-  state.races.push({
-    id: uid(),
-    date: raceDateInput.value || activeDate,
-    targetTime: targetRaw === "" ? null : Number(targetRaw),
-    touchdowns,
-    finish,
-    notes: raceNotesInput.value.trim(),
-  });
-  saveState();
-
-  for (const point of CHECKPOINTS) document.getElementById(`raceInput-${point.key}`).value = "";
-  raceTargetInput.value = "";
-  raceNotesInput.value = "";
-  raceFormHint.textContent = "Carrera guardada.";
-  renderRaces();
-}
-
-function buildRaceTable(race) {
-  const rows = raceSegments(race);
-  const slowest = slowestSegmentIndex(rows);
-
-  const table = document.createElement("table");
-  table.className = "data";
-
-  const head = document.createElement("thead");
-  const headRow = document.createElement("tr");
-  for (const label of ["Valla", "Distancia", "Acumulado", "Segmento"]) {
-    const th = document.createElement("th");
-    th.textContent = label;
-    headRow.appendChild(th);
-  }
-  head.appendChild(headRow);
-  table.appendChild(head);
-
-  const body = document.createElement("tbody");
-  rows.forEach((row, i) => {
-    const tr = document.createElement("tr");
-
-    const name = document.createElement("td");
-    name.textContent = row.point.label;
-    tr.appendChild(name);
-
-    const distance = document.createElement("td");
-    distance.textContent = `${row.point.distance} m`;
-    tr.appendChild(distance);
-
-    const cumulative = document.createElement("td");
-    cumulative.className = "num";
-    cumulative.textContent = row.cumulative == null ? "—" : row.cumulative.toFixed(2);
-    tr.appendChild(cumulative);
-
-    const segment = document.createElement("td");
-    segment.className = "num" + (i === slowest ? " slowest" : "");
-    segment.textContent = row.segment == null ? "—" : row.segment.toFixed(2);
-    if (i === slowest) segment.title = "Segmento más lento de esta carrera";
-    tr.appendChild(segment);
-
-    body.appendChild(tr);
-  });
-  table.appendChild(body);
-
-  const wrap = document.createElement("div");
-  wrap.className = "table-wrap";
-  wrap.appendChild(table);
-  return wrap;
-}
-
-function renderRacesList() {
-  racesList.innerHTML = "";
-  if (!state.races.length) {
-    const empty = document.createElement("p");
-    empty.className = "muted";
-    empty.textContent = "Todavía no hay carreras registradas.";
-    racesList.appendChild(empty);
-    return;
-  }
-
-  const races = state.races.slice().sort((a, b) => b.date.localeCompare(a.date));
-  for (const race of races) {
-    const block = document.createElement("div");
-    block.className = "race-block";
-
-    const head = document.createElement("div");
-    head.className = "race-head";
-
-    const title = document.createElement("span");
-    title.className = "race-title";
-    title.textContent = raceLabel(race);
-    head.appendChild(title);
-
-    const meta = document.createElement("span");
-    meta.className = "race-meta";
-    const bits = [];
-    if (race.targetTime != null) bits.push(`objetivo ${Number(race.targetTime).toFixed(2)} s`);
-    if (race.notes) bits.push(race.notes);
-    meta.textContent = bits.join(" · ");
-    head.appendChild(meta);
-
-    block.appendChild(head);
-    block.appendChild(buildRaceTable(race));
-    racesList.appendChild(block);
-  }
-}
-
-function renderRaceCompare() {
-  const races = state.races.slice().sort((a, b) => b.date.localeCompare(a.date));
-  raceCompare.hidden = races.length < 2;
-  if (races.length < 2) return;
-
-  const previousA = raceCompareA.value;
-  const previousB = raceCompareB.value;
-
-  for (const select of [raceCompareA, raceCompareB]) {
-    select.innerHTML = "";
-    for (const race of races) {
-      const option = document.createElement("option");
-      option.value = race.id;
-      option.textContent = raceLabel(race);
-      select.appendChild(option);
-    }
-  }
-  raceCompareA.value = races.some((r) => r.id === previousA) ? previousA : races[0].id;
-  raceCompareB.value = races.some((r) => r.id === previousB) ? previousB : races[1].id;
-
-  const raceA = races.find((r) => r.id === raceCompareA.value);
-  const raceB = races.find((r) => r.id === raceCompareB.value);
-  const rowsA = raceSegments(raceA);
-  const rowsB = raceSegments(raceB);
-  const slowestA = slowestSegmentIndex(rowsA);
-  const slowestB = slowestSegmentIndex(rowsB);
-
-  raceCompareTable.innerHTML = "";
-  const head = document.createElement("thead");
-  const headRow = document.createElement("tr");
-  for (const label of ["Valla", "Distancia", "A", "B", "Δ"]) {
-    const th = document.createElement("th");
-    th.textContent = label;
-    headRow.appendChild(th);
-  }
-  head.appendChild(headRow);
-  raceCompareTable.appendChild(head);
-
-  const body = document.createElement("tbody");
-  CHECKPOINTS.forEach((point, i) => {
-    const tr = document.createElement("tr");
-
-    const name = document.createElement("td");
-    name.textContent = point.label;
-    tr.appendChild(name);
-
-    const distance = document.createElement("td");
-    distance.textContent = `${point.distance} m`;
-    tr.appendChild(distance);
-
-    const a = document.createElement("td");
-    a.className = "num" + (i === slowestA ? " slowest" : "");
-    a.textContent = rowsA[i].segment == null ? "—" : rowsA[i].segment.toFixed(2);
-    tr.appendChild(a);
-
-    const b = document.createElement("td");
-    b.className = "num" + (i === slowestB ? " slowest" : "");
-    b.textContent = rowsB[i].segment == null ? "—" : rowsB[i].segment.toFixed(2);
-    tr.appendChild(b);
-
-    const delta = document.createElement("td");
-    delta.className = "num";
-    if (rowsA[i].segment == null || rowsB[i].segment == null) {
-      delta.textContent = "—";
-    } else {
-      const value = rowsB[i].segment - rowsA[i].segment;
-      delta.textContent = `${value > 0 ? "+" : ""}${value.toFixed(2)}`;
-      if (Math.abs(value) >= 0.005) delta.classList.add(value > 0 ? "delta-worse" : "delta-better");
-    }
-    tr.appendChild(delta);
-
-    body.appendChild(tr);
-  });
-  raceCompareTable.appendChild(body);
-}
-
-function renderRaces() {
-  renderRacesList();
-  renderRaceCompare();
-}
-
-raceCompareA.addEventListener("change", renderRaceCompare);
-raceCompareB.addEventListener("change", renderRaceCompare);
-
-raceForm.addEventListener("submit", (e) => {
-  e.preventDefault();
-  addRace();
-});
 
 function renderStats() {
   const total = state.habits.length;
@@ -3281,7 +3386,7 @@ function exportState() {
 function validateImported(data) {
   if (!isPlainObject(data)) return "El archivo no contiene un objeto JSON.";
   if (!Array.isArray(data.habits)) return "Al archivo le falta la lista de hábitos.";
-  const objectFields = ["sleep", "recovery"];
+  const objectFields = ["sleep", "recovery", "tests"];
   for (const field of objectFields) {
     if (data[field] !== undefined && !isPlainObject(data[field])) {
       return `El campo "${field}" no tiene la forma esperada.`;
@@ -3308,6 +3413,7 @@ function describeState(candidate) {
     plural(candidate.gym.length, "sesión de gimnasio", "sesiones de gimnasio"),
     plural(candidate.marks.length, "marca", "marcas"),
     plural(candidate.races.length, "carrera", "carreras"),
+    plural(Object.keys(candidate.tests).length, "mes de pruebas", "meses de pruebas"),
   ].join(", ");
 }
 
@@ -3415,6 +3521,8 @@ themeToggle.addEventListener("click", () => {
 })();
 
 renderDraftSets();
+testMonthInput.value = monthKey(new Date());
+loadMonthIntoForm();
 renderAll();
 </script>
 </body>
