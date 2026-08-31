@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Temporada</title>
+<title>Rastreador de hábitos</title>
 <style>
 :root {
   --bg: #e9e5d8;
@@ -1122,7 +1122,7 @@ table.data tr:last-child td { border-bottom: none; }
 <body>
   <div class="app">
     <header>
-      <h1>Temporada</h1>
+      <h1>Rastreador de hábitos</h1>
       <div class="header-actions">
         <button id="exportBtn" class="icon-btn" title="Exportar datos" aria-label="Exportar datos">⬇️</button>
         <button id="importBtn" class="icon-btn" title="Importar datos" aria-label="Importar datos">⬆️</button>
@@ -1880,6 +1880,11 @@ const MONTH_LABELS = [
  * grupo lleva su etiqueta encima. Con 26 semanas a la vista, sin esto la
  * cuadrícula es una tira de días sin ninguna referencia de dónde acaba un mes.
  *
+ * El orden es del más reciente al más antiguo de izquierda a derecha: lo que
+ * se mira todos los días es la semana en curso, y así queda a la vista sin
+ * tener que arrastrar la barra hasta el final. Las filas siguen siendo lunes
+ * a domingo de arriba abajo.
+ *
  * `makeCell(key, date)` devuelve la celda ya configurada. Devuelve un Map de
  * fecha -> celda para poder actualizarlas de a una.
  */
@@ -1901,10 +1906,13 @@ function paintHeatmap(container, makeCell) {
     }
   }
 
+  // Orden de pintado: el mes más reciente primero, o sea en la columna 1.
+  const ordered = groups.slice().reverse();
+
   // Pista de columnas: las semanas de cada mes, con un hueco entre meses.
   const tracks = [];
   const startColumns = [];
-  for (const group of groups) {
+  for (const group of ordered) {
     if (tracks.length) tracks.push("var(--month-gap)");
     startColumns.push(tracks.length + 1);
     for (let i = 0; i < group.weeks.length; i++) tracks.push("var(--cell)");
@@ -1912,14 +1920,15 @@ function paintHeatmap(container, makeCell) {
   container.style.gridTemplateColumns = tracks.join(" ");
 
   const cells = new Map();
-  groups.forEach((group, index) => {
+  ordered.forEach((group, index) => {
     const startColumn = startColumns[index];
-    const previous = groups[index - 1];
+    const previous = ordered[index - 1];
+    const lastWeek = group.weeks.length - 1;
 
     const label = document.createElement("span");
     label.className = "heatmap-month-label";
-    // El año sólo cuando cambia: la temporada llega a febrero y "ene" a secas
-    // sería ambiguo junto a diciembre.
+    // El año sólo cuando cambia respecto del mes que queda a su izquierda:
+    // "ene" a secas sería ambiguo pegado a "dic" del año anterior.
     const showYear = !previous || previous.year !== group.year;
     label.textContent =
       MONTH_LABELS[group.month] + (showYear ? ` ${String(group.year).slice(2)}` : "");
@@ -1927,10 +1936,13 @@ function paintHeatmap(container, makeCell) {
     container.appendChild(label);
 
     group.weeks.forEach((week, weekIndex) => {
+      // Dentro del mes también se invierte: la semana más reciente del grupo
+      // queda pegada al grupo del mes siguiente, que está a su izquierda.
+      const column = startColumn + (lastWeek - weekIndex);
       week.forEach((date, weekday) => {
         const key = dateKey(date);
         const cell = makeCell(key, date);
-        cell.style.gridColumn = String(startColumn + weekIndex);
+        cell.style.gridColumn = String(column);
         cell.style.gridRow = String(weekday + 2);
         container.appendChild(cell);
         cells.set(key, cell);
@@ -1940,7 +1952,6 @@ function paintHeatmap(container, makeCell) {
 
   return cells;
 }
-
 /** Devuelve un Map de fecha -> celda, para poder actualizarlas de a una. */
 function renderHeatmap(container, habit) {
   ensureHeatmapAxis(container);

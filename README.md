@@ -1,4 +1,4 @@
-# Temporada 🏃
+# Rastreador de hábitos 🏃
 
 Rastreador de entrenamiento para atletismo, hecho en un solo archivo HTML.
 Sin instalar nada, sin servidor y sin base de datos: se abre en el navegador y
@@ -13,7 +13,8 @@ Pensado para usarse desde el celular, en la pista, entre series.
 - 🦵 Molestia de isquiotibiales, con registro independiente por pierna (0–10) y
   nota del día. Banners automáticos de alerta según la evolución de los últimos días.
 - 🌙 Sueño: horas y calidad, con medidor y mapa de calor.
-- ✅ Hábitos diarios con rachas y mapa de calor de 26 semanas, agrupado por mes.
+- ✅ Hábitos diarios con rachas y mapa de calor de 26 semanas, agrupado por mes,
+  del más reciente a la izquierda.
 
 **Entrenamiento**
 

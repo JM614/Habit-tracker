@@ -1,4 +1,4 @@
-# Temporada — index.html
+# Rastreador de hábitos — index.html
 
 Rastreador personal de entrenamiento de 400 m con vallas. Una sola página que el
 usuario abre desde su disco y usa desde el celular, de pie en la pista.
@@ -36,6 +36,9 @@ volver a medir dos meses después.
 Se usa con el dedo, con frío y con prisa. Lo incómodo de capturar no se captura.
 
 - Objetivos táctiles de 44 px mínimo. Las celdas del heatmap suben a 15 px bajo 640 px.
+- El heatmap va del mes más reciente a la izquierda hacia atrás en el tiempo. Lo
+  que se mira a diario es la semana en curso: si queda al final de la tira, hay
+  que arrastrar la barra cada vez para verla.
 - Nada de `confirm()` ni `alert()`: confirmación en línea dentro de la tarjeta.
 - El drag and drop de HTML5 no funciona con el dedo. Botones de subir y bajar.
 - Ningún gesto destructivo ni intrusivo en un toque simple sobre texto.

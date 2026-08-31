@@ -6,3 +6,6 @@ entrenamiento-*.json
 .Rhistory
 .DS_Store
 Thumbs.db
+
+# Archivo de prueba para verificar la importación. No es un respaldo real.
+prueba-importacion.json
