@@ -62,3 +62,7 @@ Los gráficos son SVG escrito a mano.
 Las convenciones del proyecto están en [`CLAUDE.md`](CLAUDE.md): restricciones
 del archivo único, reglas de migración de datos y criterios de verificación.
 Léelo antes de tocar el esquema de `localStorage`.
+
+## Licencia
+
+MIT — ver [`LICENSE`](LICENSE).
